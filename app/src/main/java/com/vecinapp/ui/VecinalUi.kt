@@ -1,6 +1,6 @@
 package com.vecinapp.ui
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,214 +17,275 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.Typography
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.rememberAsyncImagePainter
+import coil.compose.AsyncImage
+import com.vecinapp.ScreenAnuncios
+import com.vecinapp.ScreenEventos
+import com.vecinapp.ScreenSettings
+import com.vecinapp.ScreenSugerencias
+import com.vecinapp.ScreenTablon
 
-/* ------------------ COLORS ------------------ */
-val PrimaryColor = Color(0xFF2E7D32)
-val AccentColor  = Color(0xFFFFC107)
-val DangerColor  = Color(0xFFD32F2F)
-val Gray100      = Color(0xFFFAFAFA)
-val Gray700      = Color(0xFF616161)
-
-@Composable
-fun VecinalTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = lightColorScheme(
-            primary   = PrimaryColor,
-            secondary = AccentColor,
-            error     = DangerColor,
-            background = Gray100,
-            surface    = Color.White,
-            onPrimary  = Color.White,
-            onSecondary = Color.Black
-        ),
-        typography = Typography(
-            bodyLarge  = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp),
-            titleLarge = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-        ),
-        content = content
-    )
+/* ------------------------------------------------------------
+ *  1.  Helpers de tamaño – dependen de si es modo Senior
+ * ----------------------------------------------------------- */
+private object Dim {
+    private fun k(senior: Boolean) = if (senior) 1.25f else 1f
+    fun gap  (s: Boolean) = (20 * k(s)).dp
+    fun cardH(s: Boolean) = (140 * k(s)).dp
+    fun icon (s: Boolean) = (48 * k(s)).dp
+    fun btnH (s: Boolean) = (56 * k(s)).dp
+    fun text (s: Boolean) = (18 * k(s)).sp
 }
 
-/* ------------------ DIMENSIONS ------------------ */
-object Dimens {
-    var scale by mutableFloatStateOf(1f)
-    val btnHeight : Dp @Composable get() = (56  * scale).dp
-    val iconSize  : Dp @Composable get() = (48  * scale).dp
-    val cardH     : Dp @Composable get() = (140 * scale).dp
-    val gap       : Dp @Composable get() = (24  * scale).dp
-}
-fun setSeniorMode(on: Boolean) { Dimens.scale = if (on) 1.2f else 1f }
-
-/* ------------------ COMMON BUTTONS ------------------ */
-@Composable
-fun FilledBtn(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(Dimens.btnHeight),
-        shape = RoundedCornerShape(12.dp)
-    ) { Text(label, fontSize = 18.sp * Dimens.scale) }
-}
-
-@Composable
-fun OutBtn(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    OutlinedButton(
-        onClick = onClick,
-        modifier = modifier.height(Dimens.btnHeight),
-        shape = RoundedCornerShape(12.dp)
-    ) { Text(label, fontSize = 18.sp * Dimens.scale) }
-}
-
-/* ------------------ ONBOARDING ------------------ */
+/* ------------------------------------------------------------
+ *  2.  On‑boarding – elige estilo visual
+ * ----------------------------------------------------------- */
 @Composable
 fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
+    var senior by remember { mutableStateOf(false) }
+
     Column(
-        Modifier.fillMaxSize().padding(top = 40.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.surface
+                    )
+                )
+            )
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(32.dp, Alignment.CenterVertically)
     ) {
-        Text("¿Cómo prefieres ver la app?", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(32.dp))
-        FilledBtn(
-            label = "Modo Adulto Mayor",
-            onClick = { onSelect(true) }
-        )
-        Spacer(Modifier.height(12.dp))
-        OutBtn(
-            label = "Modo Estándar",
-            onClick = { onSelect(false) }
-        )
-        Spacer(Modifier.height(24.dp))
-        Text("Puedes cambiarlo en Ajustes", color = Gray700)
+
+        Text("¿Cómo prefieres ver la app?", style = MaterialTheme.typography.headlineSmall)
+
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            ModeSwitchButton("Estándar", !senior, onClick = { senior = false })
+            ModeSwitchButton("Senior",   senior,  onClick = { senior = true  })
+        }
+
+        Button(
+            onClick  = { onSelect(senior) },
+            modifier = Modifier.fillMaxWidth(.6f),
+            shape    = RoundedCornerShape(24.dp)
+        ) { Text("Continuar") }
     }
 }
 
-/* ------------------ DASHBOARD SENIOR ------------------ */
 @Composable
-fun DashboardSeniorScreen(onNav: (Any) -> Unit) {
-    val items = listOf(
-        Triple("Anuncios",    Icons.Default.Notifications,   ScreenAnuncios),
-        Triple("Eventos",     Icons.Default.Event,           ScreenEventos),
-        Triple("Sugerencias", Icons.Default.Lightbulb,       ScreenSugerencias),
-        Triple("Tablón",      Icons.Default.Chat,            ScreenTablon)
+private fun ModeSwitchButton(
+    label   : String,
+    selected: Boolean,
+    onClick : () -> Unit
+) {
+    val bgColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val txtColor by animateColorAsState(
+        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
     )
-    Column(Modifier.fillMaxSize().padding(Dimens.gap)) {
-        // grid
-        LazyColumn { item { GridButtons(items, onNav) } }
-        // FAB para panel directivo (demo: siempre visible)
-        FloatingActionButton(onClick = { onNav(ScreenPanel) }, modifier = Modifier.align(Alignment.End)) {
-            Icon(Icons.Default.Settings, contentDescription = null)
-        }
-    }
-    Column(Modifier.fillMaxSize().padding(Dimens.gap)) {
-        // grid
-        LazyColumn { item { GridButtons(items, onNav) } }
-        // FAB para panel directivo (demo: siempre visible)
-        FloatingActionButton(onClick = { onNav(ScreenPanel) }, modifier = Modifier.align(Alignment.End)) {
-            Icon(Icons.Default.Delete, contentDescription = null)
+    Button(
+        onClick,
+        shape   = RoundedCornerShape(16.dp),
+        colors  = ButtonDefaults.buttonColors(
+            containerColor = bgColor,
+            contentColor   = txtColor
+        ),
+        modifier = Modifier.height(Dim.btnH(selected))
+    ) { Text(label) }
+}
+
+/* ------------------------------------------------------------
+ *  3.  Dashboard (elige plantilla según modo)
+ * ----------------------------------------------------------- */
+@Composable
+fun DashboardScreen(
+    isSenior : Boolean,
+    onNavigate: (Any) -> Unit
+) {
+    if (isSenior) {
+        SeniorDashboard(onNavigate)
+    } else {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Bienvenido 👋", style = MaterialTheme.typography.headlineMedium)
         }
     }
 }
 
+/* === 3a. Dashboard modo SENIOR ================================= */
 @Composable
-fun GridButtons(items: List<Triple<String, ImageVector, Any>>, onClick: (Any) -> Unit) {
+private fun SeniorDashboard(onNavigate: (Any) -> Unit) {
+
+    val modules = listOf(
+        Triple("Anuncios",    Icons.Default.Notifications, ScreenAnuncios),
+        Triple("Eventos",     Icons.Default.Event,         ScreenEventos),
+        Triple("Sugerencias", Icons.Default.Lightbulb,     ScreenSugerencias),
+        Triple("Tablón",      Icons.Default.Chat,          ScreenTablon)
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(Dim.gap(true)),
+        verticalArrangement = Arrangement.spacedBy(Dim.gap(true))
+    ) {
+
+        /* grid 2×2 */
+        item {
+            Grid2x2(modules) { onNavigate(it) }
+        }
+
+        /* tarjeta extra: Ajustes */
+        item {
+            LargeCard("Ajustes", Icons.Default.Settings) { onNavigate(ScreenSettings) }
+        }
+    }
+}
+
+/* ---------- grid helper ---------- */
+@Composable
+private fun Grid2x2(
+    items   : List<Triple<String, ImageVector, Any>>,
+    onClick : (Any) -> Unit
+) {
     Column {
         items.chunked(2).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
-                row.forEach { (txt, ic, route) ->
-                    DashCard(txt, ic, Modifier.weight(1f)) { onClick(route) }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Dim.gap(true))
+            ) {
+                row.forEach { (title, icon, dest) ->
+                    LargeCard(title, icon, Modifier.weight(1f)) { onClick(dest) }
                 }
             }
-            Spacer(Modifier.height(Dimens.gap))
+            Spacer(Modifier.height(Dim.gap(true)))
         }
     }
 }
 
+/* ---------- tarjeta grande reutilizable ---------- */
 @Composable
-fun DashCard(label: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Card(
-        modifier = modifier.height(Dimens.cardH).clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = PrimaryColor)
+private fun LargeCard(
+    title   : String,
+    icon    : ImageVector,
+    modifier: Modifier = Modifier,
+    onClick : () -> Unit
+) = Card(
+    modifier = modifier
+        .height(Dim.cardH(true))
+        .clip(RoundedCornerShape(16.dp))
+        .clickable(onClick = onClick),
+    colors  = CardDefaults.elevatedCardColors(MaterialTheme.colorScheme.primary)
+) {
+    Column(
+        Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-            Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(Dimens.iconSize))
-            Spacer(Modifier.height(8.dp))
-            Text(label, color = Color.White, fontSize = 18.sp * Dimens.scale)
-        }
+        Icon(icon, null,
+            tint     = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(Dim.icon(true))
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            title,
+            color    = MaterialTheme.colorScheme.onPrimary,
+            fontSize = Dim.text(true),
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 
-/* ------------------ ANUNCIOS ------------------ */
+/* ------------------------------------------------------------
+ *  4.  Lista de Eventos (estándar + placeholder)
+ * ----------------------------------------------------------- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AnunciosScreen() {
-    Scaffold(topBar = { CenterAlignedTopAppBar({ Text("Anuncios") }) }) {
-        Box(Modifier.fillMaxSize().padding(it), contentAlignment = Alignment.Center) {
-            Text("Próximamente anuncios de la comunidad")
-        }
-    }
-}
-
-/* ------------------ STUB OTRAS PANTALLAS ------------------ */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EventosListScreen(onEvent: () -> Unit) {
-    Scaffold(topBar = { CenterAlignedTopAppBar({ Text("Eventos") }) }) { p ->
-        LazyColumn(Modifier.padding(p)) {
-            items(3) {
-                EventCard("Completada", "24 MAY", "13‑18 h", "https://picsum.photos/400", onEvent)
+fun EventosListScreen(onEventClick: () -> Unit) {
+    Scaffold(topBar = { CenterAlignedTopAppBar({ Text("Eventos") }) }) { padd ->
+        LazyColumn(
+            Modifier
+                .padding(padd)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            items(4) { idx ->
+                EventCard(
+                    title = "Convivencia vecinal",
+                    date  = "10 JUN",
+                    time  = "11:00 – 14:00",
+                    img   = "https://picsum.photos/400?$idx",
+                    onClick = onEventClick
+                )
             }
         }
     }
 }
 
 @Composable
-fun EventCard(title: String, dateLabel: String, timeLabel: String, thumbnail: String, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
-        Image(painter = rememberAsyncImagePainter(thumbnail), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.height(120.dp).fillMaxWidth())
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                Box(Modifier.background(AccentColor, RoundedCornerShape(12.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                    Text(dateLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Text(timeLabel, fontSize = 14.sp, color = Gray700)
-        }
+private fun EventCard(
+    title: String,
+    date : String,
+    time : String,
+    img  : String,
+    onClick: () -> Unit
+) = Card(
+    onClick,
+    shape  = RoundedCornerShape(16.dp),
+    colors = CardDefaults.elevatedCardColors()
+) {
+    AsyncImage(
+        model = img,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+    )
+    Column(Modifier.padding(16.dp)) {
+        Text(title, style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(4.dp))
+        Text("$date  •  $time", style = MaterialTheme.typography.bodyMedium)
     }
 }
 
-@Composable fun SugerenciasListScreen() { Text("Sugerencias (stub)") }
-@Composable fun TablonListScreen() { Text("Tablón (stub)") }
-@Composable fun PanelDirectivoScreen() { Text("Panel Directivo (stub)") }
+/* ------------------------------------------------------------
+ *  5.  Módulos stub rápidos
+ * ----------------------------------------------------------- */
+@Composable fun AnunciosScreen()        = CenterText("Próximamente anuncios")
+@Composable fun SugerenciasListScreen() = CenterText("Sugerencias (stub)")
+@Composable fun TablonListScreen()      = CenterText("Tablón (stub)")
+@Composable fun PanelDirectivoScreen()  = CenterText("Panel directivo (stub)")
+
+@Composable
+private fun CenterText(msg: String) = Box(
+    Modifier.fillMaxSize(), contentAlignment = Alignment.Center
+) { Text(msg) }

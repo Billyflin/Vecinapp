@@ -1,5 +1,7 @@
 [versions]
 agp = "8.9.2"
+auth = "2.1.0"
+firebaseBom = "33.13.0"
 kotlin = "2.0.21"
 coreKtx = "1.16.0"
 junit = "4.13.2"
@@ -20,10 +22,25 @@ materialIconsExtended = "1.7.8"
 navigationRuntimeKtx = "2.8.9"
 navigationCompose = "2.8.9"
 googleGmsGoogleServices = "4.4.2"
+onetapcompose = "1.0.12"
+playServicesAuth        = "20.7.0"   # ← estable
+credentialsPlayServicesAuth = "1.2.2"
+firebaseCrashlyticsBuildtools = "3.0.3" # ← compatible con 20.7
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+
 androidx-material-icons-extended = { module = "androidx.compose.material:material-icons-extended", version.ref = "materialIconsExtended" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-auth = { module = "com.google.firebase:firebase-auth" }
+
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
+
+# credenciales One‑Tap
+androidx-credentials = { module = "androidx.credentials:credentials",                     version.ref = "credentialsPlayServicesAuth" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -48,6 +65,8 @@ maps-ktx = { module = "com.google.maps.android:maps-ktx", version.ref = "mapsKtx
 coil-compose = { module = "io.coil-kt:coil-compose", version = "2.7.0" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version = "1.8.1" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
+onetapcompose = { module = "com.github.stevdza-san:OneTapCompose", version.ref = "onetapcompose" }
+firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 
 
 

@@ -59,10 +59,14 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation (libs.androidx.datastore.preferences)
 
+    implementation(libs.onetapcompose)
 
     implementation (libs.coil.compose)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.play.services.auth)
+    implementation(libs.firebase.crashlytics.buildtools)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -81,6 +85,13 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.generativeai)
     testImplementation(libs.junit)
+    implementation(platform(libs.firebase.bom))
+
+    implementation(libs.firebase.auth)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.androidx.credentials)
+
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

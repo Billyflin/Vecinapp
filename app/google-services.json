@@ -12,7 +12,20 @@
           "package_name": "com.vecinapp"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "283462503961-glkcuvfkled8vu5nbmiupgd9sa64d4t4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.vecinapp",
+            "certificate_hash": "d0d62d98a337c23c0b578ebb547ef5b36413784f"
+          }
+        },
+        {
+          "client_id": "283462503961-5iorqubjmarq93hu5qu1ojnf4snvfirt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC4SBEwL4SdjqhwWZHJMz5QCUu599-4bCo"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "283462503961-5iorqubjmarq93hu5qu1ojnf4snvfirt.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
