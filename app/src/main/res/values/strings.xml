@@ -1,0 +1,42 @@
+<resources>
+    <string name="app_name">VecinApp</string>
+    <!--  Onboarding  -->
+    <string name="welcome_title">Bienvenido a VecinApp</string>
+    <string name="welcome_description">Conecta con tu comunidad vecinal de forma fácil y segura</string>
+    <string name="get_started">Comenzar</string>
+    <!--  Authentication  -->
+    <string name="enter_phone">Ingresa tu número de teléfono</string>
+    <string name="phone_description">Te enviaremos un código de verificación para confirmar tu identidad</string>
+    <string name="phone_number">Número de teléfono</string>
+    <string name="phone_placeholder">+56 9 1234 5678</string>
+    <string name="continue_button">Continuar</string>
+    <string name="verification_title">Verificación</string>
+    <string name="verification_description">Ingresa el código de 6 dígitos enviado a %s</string>
+    <string name="verification_code">Código de verificación</string>
+    <string name="verify">Verificar</string>
+    <string name="verifying">Verificando...</string>
+    <string name="resend_code">Reenviar código</string>
+    <string name="change_phone">Cambiar número de teléfono</string>
+    <!--  Community Selection  -->
+    <string name="select_community">Selecciona tu comunidad</string>
+    <string name="nearby_communities">Estas son las comunidades cercanas a tu ubicación</string>
+    <string name="no_communities">No hay comunidades cercanas</string>
+    <string name="create_community">Crear una comunidad</string>
+    <string name="error_loading_communities">Error al cargar comunidades</string>
+    <string name="retry">Reintentar</string>
+    <string name="members_count">%d miembros</string>
+    <!--  Accessibility  -->
+    <string name="accessibility_title">¿Cómo prefieres ver la app?</string>
+    <string name="senior_mode">Modo Senior</string>
+    <string name="senior_description">Texto grande, botones amplios y guía por voz</string>
+    <string name="standard_mode">Modo Estándar</string>
+    <string name="standard_description">Interfaz normal con todas las funcionalidades</string>
+    <string name="select">Seleccionar</string>
+    <!--  Dashboard  -->
+    <string name="what_to_do">¿Qué deseas hacer hoy?</string>
+    <string name="announcements">Anuncios & Alertas</string>
+    <string name="events">Eventos</string>
+    <string name="suggestions">Sugerencias / Reclamos</string>
+    <string name="community_board">Tablón Comunitario</string>
+    <string name="admin_panel">Panel Directivo</string>
+</resources>
