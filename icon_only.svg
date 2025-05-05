@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="104.837 64.67 295.185 288.92" width="295.185px" height="288.92px">
+    <path d="M 104.837 163.551 L 252.429 64.67 L 400.022 163.551" fill="none" stroke="#FFFFFF" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" style="" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -1.1368683772161603e-13, 0)"/>
+    <circle cx="257.594" cy="256.38" r="48" fill="#FFFFFF" style="" transform="matrix(0.9727079868316649, 0, 0, 0.9750820398330687, 0.04350300133216933, -45.711036682128906)"/>
+    <rect x="203.309" y="259.982" width="93.38" height="93.608" rx="24" fill="#FFFFFF" style="" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -1.1368683772161603e-13, 0)"/>
+    <circle cx="177.594" cy="288.38" r="32" fill="#FFFFFF" style="" transform="matrix(0.9727079868316649, 0, 0, 0.9750820398330687, -14.107165336608887, -37.318572998046875)"/>
+    <rect x="127.513" y="279.976" width="62.253" height="62.405" rx="16" fill="#FFFFFF" style="" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -1.1368683772161603e-13, 0)"/>
+    <circle cx="337.594" cy="288.38" r="32" fill="#FFFFFF" style="" transform="matrix(0.9727079868316649, 0, 0, 0.9750820398330687, 14.624304771423226, -40.850772857666016)"/>
+    <rect x="311.878" y="278.406" width="62.253" height="62.405" rx="16" fill="#FFFFFF" style="" transform="matrix(0.9999999999999999, 0, 0, 0.9999999999999999, -1.1368683772161603e-13, 0)"/>
+</svg>
