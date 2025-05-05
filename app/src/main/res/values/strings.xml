@@ -34,7 +34,7 @@
     <string name="select">Seleccionar</string>
     <!--  Dashboard  -->
     <string name="what_to_do">¿Qué deseas hacer hoy?</string>
-    <string name="announcements">Anuncios & Alertas</string>
+    <string name="announcements">Anuncios &amp; Alertas</string>
     <string name="events">Eventos</string>
     <string name="suggestions">Sugerencias / Reclamos</string>
     <string name="community_board">Tablón Comunitario</string>
