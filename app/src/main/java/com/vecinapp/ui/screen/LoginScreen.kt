@@ -2,6 +2,7 @@ package com.vecinapp.ui.screen
 
 import android.app.Activity
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
@@ -84,7 +85,7 @@ fun LoginScreen(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
 
             Image(
-                painterResource(R.drawable.icon_only),
+                painterResource(R.drawable.icon_text),
                 contentDescription = "Logo",
                 colorFilter = ColorFilter.tint(cs.onPrimary),
                 modifier = Modifier.size(320.dp)
@@ -129,6 +130,23 @@ fun LoginScreen(
                 )
             ) {
                 Text("Ingresar como Invitado")
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            /* ---------- Invitado ---------- */
+            Button(
+                onClick = {
+                    Log.d(TAG, "Anonymous sign‑in …")
+                    Toast.makeText(context, "No implementado por que cobran", Toast.LENGTH_SHORT).show()
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = cs.onPrimary,
+                    contentColor = cs.primary
+                )
+            ) {
+                Text("Ingresar con Numero de Celular")
             }
         }
     }

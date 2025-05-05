@@ -1,5 +1,6 @@
 package com.vecinapp.presentation
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -131,6 +132,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                             launchSingleTop = true
                         }
                     }) {
+                        Log.d("user", user.toString())
                         if (user?.photoUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
