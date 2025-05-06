@@ -253,10 +253,6 @@ data class ColorFamily(
     val onColorContainer: Color
 )
 
-val unspecified_scheme = ColorFamily(
-    Color.Unspecified, Color.Unspecified, Color.Unspecified, Color.Unspecified
-)
-
 
 enum class ContrastLevel {
     NORMAL, MEDIUM, HIGH

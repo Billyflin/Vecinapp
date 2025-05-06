@@ -42,13 +42,12 @@ import com.vecinapp.R
 import com.vecinapp.presentation.GoogleSignInButton
 
 private sealed class LoginStep {
-    object Choice : LoginStep()
-    object PhoneInput : LoginStep()
+    data object Choice : LoginStep()
+    data object PhoneInput : LoginStep()
     data class Otp(val verificationId: String, val token: PhoneAuthProvider.ForceResendingToken) :
         LoginStep()
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
     onSignInSuccess: () -> Unit

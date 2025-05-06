@@ -77,7 +77,6 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     isSenior: Boolean,
