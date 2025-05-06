@@ -1,6 +1,10 @@
 package com.vecinapp.ui.screen
 
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 
 @Composable
-fun PanelDirectivoScreen() = CenterText("Panel directivo (stub)")
+fun PanelDirectivoScreen() {
+
+    Text("Panel directivo (stub)")
+}
