@@ -16,7 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Diversity3
 import androidx.compose.material.icons.filled.Elderly
@@ -47,18 +49,23 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun ModeCard(
-    title: String, icon: ImageVector, selected: Boolean, onClick: () -> Unit
+    title: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
 ) {
     val elevation by animateDpAsState(
-        targetValue = if (selected) 8.dp else 1.dp, animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow
+        targetValue = if (selected) 8.dp else 1.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
         )
     )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(160.dp)
+            .height(140.dp)
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -74,7 +81,7 @@ fun ModeCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -82,16 +89,16 @@ fun ModeCard(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(40.dp),
                 tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             // Título
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall.copy(
+                style = MaterialTheme.typography.titleLarge.copy(
                     fontWeight = FontWeight.Bold
                 ),
                 color = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
@@ -144,24 +151,29 @@ fun SeniorFeatureItem(icon: ImageVector, text: String) {
 @Composable
 fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
     var isSenior by rememberSaveable { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp), horizontalAlignment = Alignment.Start
+            .padding(24.dp)
+            .verticalScroll(scrollState),
+        horizontalAlignment = Alignment.Start
     ) {
         // Saludo
         Text(
-            text = "Hola! Bienvenido!", style = MaterialTheme.typography.headlineSmall.copy(
+            text = "Hola! Bienvenido!",
+            style = MaterialTheme.typography.headlineSmall.copy(
                 fontWeight = FontWeight.Medium
             )
         )
 
         // Título y descripción
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "¿Eres un usuario senior?", style = MaterialTheme.typography.headlineMedium.copy(
+            text = "¿Eres un usuario senior?",
+            style = MaterialTheme.typography.headlineMedium.copy(
                 fontWeight = FontWeight.Bold
             )
         )
@@ -174,66 +186,96 @@ fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Opción Estándar
-        Text(
-            text = "Modo Estándar",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        ModeCard(
-            title = "Estándar",
-            icon = Icons.Default.Person,
-            selected = !isSenior,
-            onClick = { isSenior = false })
-
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Opción Senior
-        Text(
-            text = "Modo Senior",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+        // Tarjetas en modo horizontal
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Columna izquierda - Estándar
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Modo Estándar",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-        Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // Descripción de lo que ofrece el modo senior
-        Text(
-            text = "Interfaz adaptada con:",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        )
+                ModeCard(
+                    title = "Estándar",
+                    icon = Icons.Default.Person,
+                    selected = !isSenior,
+                    onClick = { isSenior = false }
+                )
+            }
 
-        Spacer(modifier = Modifier.height(4.dp))
+            // Columna derecha - Senior
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Modo Senior",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                ModeCard(
+                    title = "Senior",
+                    icon = Icons.Default.Elderly,
+                    selected = isSenior,
+                    onClick = { isSenior = true }
+                )
+            }
+        }
 
         // Características del modo senior
-        SeniorFeatureItem(
-            icon = Icons.Outlined.TextFields, text = "Textos más grandes y legibles"
-        )
+        Spacer(modifier = Modifier.height(24.dp))
 
-        SeniorFeatureItem(
-            icon = Icons.Outlined.TouchApp, text = "Botones más amplios y fáciles de tocar"
-        )
+        if (isSenior) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        text = "El modo Senior ofrece:",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
 
-        SeniorFeatureItem(
-            icon = Icons.Outlined.AccessibilityNew, text = "Navegación simplificada"
-        )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-        Spacer(modifier = Modifier.height(8.dp))
+                    SeniorFeatureItem(
+                        icon = Icons.Outlined.TextFields,
+                        text = "Textos más grandes y legibles"
+                    )
 
-        ModeCard(
-            title = "Senior",
-            icon = Icons.Default.Elderly,
-            selected = isSenior,
-            onClick = { isSenior = true })
+                    SeniorFeatureItem(
+                        icon = Icons.Outlined.TouchApp,
+                        text = "Botones más amplios y fáciles de tocar"
+                    )
 
-        // Spacer que empuja el botón hacia abajo
-        Spacer(modifier = Modifier.weight(1f))
+                    SeniorFeatureItem(
+                        icon = Icons.Outlined.AccessibilityNew,
+                        text = "Navegación simplificada"
+                    )
+                }
+            }
+        }
+
+        // Espacio para el botón
+        Spacer(modifier = Modifier.height(32.dp))
 
         // Botón de continuar
         Button(
@@ -253,11 +295,15 @@ fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Continuar", style = MaterialTheme.typography.titleMedium.copy(
+                text = "Continuar",
+                style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold
                 )
             )
         }
+
+        // Espacio adicional al final para evitar que el botón quede pegado al borde
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
