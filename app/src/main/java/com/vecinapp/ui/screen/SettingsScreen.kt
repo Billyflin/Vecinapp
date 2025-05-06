@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -35,15 +33,15 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    isSenior        : Boolean,
-    darkMode        : Boolean,
-    dynamicColors   : Boolean,
-    onSeniorChange  : suspend (Boolean) -> Unit,
-    onDarkChange    : suspend (Boolean) -> Unit,
-    onDynamicChange : suspend (Boolean) -> Unit,
-    onLinkPhone     : () -> Unit,       // ← callback para iniciar flujo de vinculación
-    onBack          : () -> Unit,
-    onLoggedOut     : () -> Unit = {},
+    isSenior: Boolean,
+    darkMode: Boolean,
+    dynamicColors: Boolean,
+    onSeniorChange: suspend (Boolean) -> Unit,
+    onDarkChange: suspend (Boolean) -> Unit,
+    onDynamicChange: suspend (Boolean) -> Unit,
+    onLinkPhone: () -> Unit,       // ← callback para iniciar flujo de vinculación
+    onBack: () -> Unit,
+    onLoggedOut: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     val user = Firebase.auth.currentUser
@@ -51,21 +49,16 @@ fun SettingsScreen(
 
     Scaffold(
         topBar = {
-           if (isSenior) TopAppBar(
-                title = { Text("Ajustes") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
-                    }
+            if (isSenior) TopAppBar(title = { Text("Ajustes") }, navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
                 }
-            )
-        }
-    ) { padd ->
+            })
+        }) { padd ->
         Column(
             Modifier
                 .padding(padd)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+                .padding(16.dp), verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
             /* ─── Apariencia ─── */
             Text("Apariencia", style = MaterialTheme.typography.titleMedium)
@@ -73,16 +66,13 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tema oscuro", Modifier.weight(1f))
                 Switch(
-                    checked = darkMode,
-                    onCheckedChange = { scope.launch { onDarkChange(it) } }
-                )
+                    checked = darkMode, onCheckedChange = { scope.launch { onDarkChange(it) } })
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Color dinámico (Monet)", Modifier.weight(1f))
                 Switch(
                     checked = dynamicColors,
-                    onCheckedChange = { scope.launch { onDynamicChange(it) } }
-                )
+                    onCheckedChange = { scope.launch { onDynamicChange(it) } })
             }
 
             /* ─── Modo visual ─── */
@@ -130,10 +120,10 @@ fun SettingsScreen(
                 onClick = { Firebase.auth.signOut(); onLoggedOut() },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
-                    contentColor   = MaterialTheme.colorScheme.onError
+                    contentColor = MaterialTheme.colorScheme.onError
                 )
             ) {
-                Icon(Icons.Default.Logout, contentDescription = null)
+                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Cerrar sesión")
             }
