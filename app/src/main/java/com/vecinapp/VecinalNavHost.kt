@@ -1,5 +1,6 @@
 package com.vecinapp
 
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +33,7 @@ fun VecinalNavHost(
     navController: NavHostController = rememberNavController(),
 
     /* Layout modifier que llega desde el Scaffold */
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.fillMaxSize(),
 
     /* Preferencias actuales */
     isSenior: Boolean,
@@ -48,9 +49,7 @@ fun VecinalNavHost(
     onLoggedOut: () -> Unit,
 ) {
     NavHost(
-        navController = navController,
-        startDestination = ScreenOnboarding,
-        modifier = modifier
+        navController = navController, startDestination = ScreenOnboarding, modifier = modifier
     ) {
 
         /* Onboarding – elegir modo visual */
@@ -73,12 +72,10 @@ fun VecinalNavHost(
 
             if (verificationId == null) {
                 RegisterScreenMobile(
-                    forceResendingToken = null,
-                    onVerificationSent = { id, token ->
+                    forceResendingToken = null, onVerificationSent = { id, token ->
                         verificationId = id
                         resendToken = token
-                    }
-                )
+                    })
             } else {
                 OtpVerificationScreen(
                     verificationId = verificationId!!,
@@ -91,8 +88,7 @@ fun VecinalNavHost(
                     onResend = {
                         // reenvío usando el token que guardamos
                         verificationId = null
-                    }
-                )
+                    })
             }
         }
 
@@ -105,16 +101,13 @@ fun VecinalNavHost(
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenRegisterPhone) { inclusive = true }
                     }
-                }
-            )
+                })
         }
 
         /* Dashboard (normal o senior) */
         composable<ScreenDashboard> {
             DashboardScreen(
-                isSenior = isSenior,
-                onNavigate = { dest -> navController.navigate(dest) }
-            )
+                isSenior = isSenior, onNavigate = { dest -> navController.navigate(dest) })
         }
 
         /* Anuncios */
@@ -139,8 +132,7 @@ fun VecinalNavHost(
                 lat = -33.45,
                 lon = -70.66,
                 isSenior = isSenior,
-                onBack = { navController.popBackStack() }
-            )
+                onBack = { navController.popBackStack() })
         }
 
         /* Sugerencias, Tablón y Panel Directivo */
@@ -198,4 +190,8 @@ object ScreenTablon
 object ScreenPanel
 
 @Serializable
-object ScreenSettings
+object ScreenSettings {
+    fun toRoute(): String {
+        return ("com.vecinapp.ScreenSettings")
+    }
+}

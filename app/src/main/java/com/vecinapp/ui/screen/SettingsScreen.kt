@@ -50,19 +50,14 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val user = Firebase.auth.currentUser
     val phone = user?.phoneNumber
-
-
-
     Column(
-        Modifier
-            .padding(16.dp), verticalArrangement = Arrangement.spacedBy(28.dp)
+        Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(28.dp)
     ) {
         if (isSenior) TopAppBar(title = { Text("Ajustes") }, navigationIcon = {
             IconButton(onClick = onBack) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver")
             }
-        })
-        /* ─── Apariencia ─── */
+        })/* ─── Apariencia ─── */
         Text("Apariencia", style = MaterialTheme.typography.titleMedium)
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -73,8 +68,7 @@ fun SettingsScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Color dinámico (Monet)", Modifier.weight(1f))
             Switch(
-                checked = dynamicColors,
-                onCheckedChange = { scope.launch { onDynamicChange(it) } })
+                checked = dynamicColors, onCheckedChange = { scope.launch { onDynamicChange(it) } })
         }
 
         /* ─── Modo visual ─── */
