@@ -74,11 +74,9 @@ import kotlinx.coroutines.delay
 fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
     val haptic = LocalHapticFeedback.current
 
-    // Get current route
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Animation for the FAB
     var showFab by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         delay(100)
@@ -94,11 +92,8 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(85.dp)
-            .padding(bottom = 8.dp),
-        contentAlignment = Alignment.BottomCenter
+            .height(132.dp), contentAlignment = Alignment.TopCenter
     ) {
-        // Main navigation bar
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -130,26 +125,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                             popUpTo(navController.graph.startDestinationId)
                             launchSingleTop = true
                         }
-                    }
-                )
-
-                // Botón 2 - Sugerencias
-                NavBarItem(
-                    icon = Icons.Default.Lightbulb,
-                    title = "Sugerencias",
-                    isSelected = currentRoute == ScreenSugerencias.toRoute(),
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        navController.navigate(ScreenSugerencias) {
-                            popUpTo(navController.graph.startDestinationId)
-                            launchSingleTop = true
-                        }
-                    }
-                )
-
-                // Espacio para el FAB
-                Spacer(modifier = Modifier.width(64.dp))
-
+                    })
                 // Botón 3 - Eventos
                 NavBarItem(
                     icon = Icons.Default.Event,
@@ -161,8 +137,23 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                             popUpTo(navController.graph.startDestinationId)
                             launchSingleTop = true
                         }
-                    }
-                )
+                    })
+
+
+                // Espacio para el FAB
+                Spacer(modifier = Modifier.width(64.dp))
+                // Botón 2 - Sugerencias
+                NavBarItem(
+                    icon = Icons.Default.Lightbulb,
+                    title = "Sugerencias",
+                    isSelected = currentRoute == ScreenSugerencias.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigate(ScreenSugerencias) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
+                    })
 
                 // Botón 4 - Cuenta (con foto de perfil si está disponible)
                 if (user?.photoUrl != null) {
@@ -176,8 +167,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                                 popUpTo(navController.graph.startDestinationId)
                                 launchSingleTop = true
                             }
-                        }
-                    )
+                        })
                 } else {
                     NavBarItem(
                         icon = Icons.Default.Person,
@@ -189,24 +179,20 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                                 popUpTo(navController.graph.startDestinationId)
                                 launchSingleTop = true
                             }
-                        }
-                    )
+                        })
                 }
             }
         }
 
-        // Community FAB
         AnimatedVisibility(
             visible = showFab,
-            enter = fadeIn(animationSpec = tween(500)) +
-                    slideInVertically(
-                        animationSpec = tween(500),
-                        initialOffsetY = { it }
-                    ),
+            enter = fadeIn(animationSpec = tween(500)) + slideInVertically(
+                animationSpec = tween(500),
+                initialOffsetY = { it }),
             exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (-20).dp)
+                .offset(y = (-30).dp) // Ajustado de -20dp a -25dp para subir más
         ) {
             FloatingActionButton(
                 onClick = {
@@ -261,27 +247,21 @@ fun NavBarItem(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
-    ) {
+            }) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (isSelected)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    else
-                        Color.Transparent
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else Color.Transparent
                 )
-                .padding(8.dp),
-            contentAlignment = Alignment.Center
+                .padding(8.dp), contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = title,
-                tint = if (isSelected)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -292,12 +272,9 @@ fun NavBarItem(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 11.sp
             ),
-            color = if (isSelected)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 2.dp)
         )
 
         // Selection indicator
@@ -314,10 +291,7 @@ fun NavBarItem(
 
 @Composable
 fun ProfileNavItem(
-    photoUrl: String,
-    title: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
+    photoUrl: String, title: String, isSelected: Boolean, onClick: () -> Unit
 ) {
     // Animations for selection
     val scale by animateFloatAsState(
@@ -340,24 +314,18 @@ fun ProfileNavItem(
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
-    ) {
+            }) {
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (isSelected)
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    else
-                        Color.Transparent
+                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else Color.Transparent
                 )
-                .padding(4.dp),
-            contentAlignment = Alignment.Center
+                .padding(4.dp), contentAlignment = Alignment.Center
         ) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(photoUrl)
-                    .crossfade(true)
+                model = ImageRequest.Builder(LocalContext.current).data(photoUrl).crossfade(true)
                     .build(),
                 contentDescription = "Foto de perfil",
                 contentScale = ContentScale.Crop,
@@ -366,10 +334,8 @@ fun ProfileNavItem(
                     .clip(CircleShape)
                     .border(
                         width = if (isSelected) 2.dp else 1.dp,
-                        color = if (isSelected)
-                            MaterialTheme.colorScheme.primary
-                        else
-                            MaterialTheme.colorScheme.outline,
+                        color = if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline,
                         shape = CircleShape
                     )
             )
@@ -381,10 +347,8 @@ fun ProfileNavItem(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                 fontSize = 11.sp
             ),
-            color = if (isSelected)
-                MaterialTheme.colorScheme.primary
-            else
-                MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (isSelected) MaterialTheme.colorScheme.primary
+            else MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 2.dp)
         )
