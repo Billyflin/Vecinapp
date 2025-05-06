@@ -25,17 +25,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Message
+import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.outlined.Error
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -183,7 +183,7 @@ fun RegisterScreenMobile(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Divider(
+                HorizontalDivider(
                     modifier = Modifier
                         .fillMaxWidth(0.7f)
                         .padding(vertical = 8.dp),
@@ -275,7 +275,7 @@ fun RegisterScreenMobile(
                 ) {
                     if (isLoading) {
                         Icon(
-                            imageVector = Icons.Default.Send,
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = null,
                             modifier = Modifier
                                 .size(24.dp)
@@ -285,7 +285,7 @@ fun RegisterScreenMobile(
                         Text("Enviando...")
                     } else {
                         Icon(
-                            imageVector = Icons.Default.Send,
+                            imageVector = Icons.AutoMirrored.Filled.Send,
                             contentDescription = null,
                             modifier = Modifier.size(24.dp)
                         )
@@ -386,7 +386,7 @@ fun OtpVerificationScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Message,
+                        imageVector = Icons.AutoMirrored.Filled.Message,
                         contentDescription = null,
                         modifier = Modifier.size(40.dp),
                         tint = MaterialTheme.colorScheme.onSecondary
@@ -411,7 +411,7 @@ fun OtpVerificationScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Divider(
+                HorizontalDivider(
                     modifier = Modifier
                         .fillMaxWidth(0.7f)
                         .padding(vertical = 8.dp),
@@ -437,7 +437,7 @@ fun OtpVerificationScreen(
                     isError = errorMessage != null,
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Message,
+                            imageVector = Icons.AutoMirrored.Filled.Message,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.secondary
                         )
