@@ -39,6 +39,7 @@ fun VecinalNavHost(
     isSenior: Boolean,
     darkMode: Boolean,
     dynamicColors: Boolean,
+    isFirstTime: Boolean,
 
     /* Callbacks para actualizarlas (DataStore) */
     onSeniorChange: suspend (Boolean) -> Unit,
@@ -49,7 +50,9 @@ fun VecinalNavHost(
     onLoggedOut: () -> Unit,
 ) {
     NavHost(
-        navController = navController, startDestination = ScreenOnboarding, modifier = modifier
+        navController = navController,
+        startDestination = if (isFirstTime) ScreenOnboarding else ScreenDashboard,
+        modifier = modifier
     ) {
 
         /* Onboarding – elegir modo visual */

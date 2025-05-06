@@ -16,6 +16,7 @@ class PreferencesManager(context: Context) {
         val DARK_MODE_KEY = booleanPreferencesKey("dark_mode")
         val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
         val IS_SENIOR_KEY = booleanPreferencesKey("is_senior")
+        val IS_FIRST_TIME_KEY = booleanPreferencesKey("is_first_time")
     }
 
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
@@ -23,8 +24,15 @@ class PreferencesManager(context: Context) {
             val darkMode = preferences[DARK_MODE_KEY] ?: false
             val dynamicColor = preferences[DYNAMIC_COLOR_KEY] ?: false
             val isSenior = preferences[IS_SENIOR_KEY] ?: false
-            UserPreferences(darkMode, dynamicColor, isSenior)
+            val isFirstTime = preferences[IS_FIRST_TIME_KEY] ?: true
+            UserPreferences(darkMode, dynamicColor, isSenior, isFirstTime)
         }
+
+    suspend fun updateIsFirstTime(isFirstTime: Boolean) {
+        dataStore.edit { preferences ->
+            preferences[IS_FIRST_TIME_KEY] = isFirstTime
+        }
+    }
 
     suspend fun updateIsSenior(isSenior: Boolean) {
         dataStore.edit { preferences ->
@@ -49,6 +57,7 @@ class PreferencesManager(context: Context) {
 data class UserPreferences(
     val darkMode: Boolean,
     val dynamicColor: Boolean,
-    val isSenior: Boolean
+    val isSenior: Boolean,
+    val isFirstTime: Boolean
 
 )

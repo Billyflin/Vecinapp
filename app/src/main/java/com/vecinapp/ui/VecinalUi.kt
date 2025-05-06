@@ -59,31 +59,3 @@ internal object Dim {
     fun btnH(s: Boolean) = (56 * k(s)).dp
     fun text(s: Boolean) = (18 * k(s)).sp
 }
-
-@Composable
-internal fun ModeSwitchButton(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val bgColor =
-        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
-    val txtColor by animateColorAsState(
-        if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
-    )
-    Button(
-        onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = bgColor,
-            contentColor = txtColor
-        ),
-        modifier = Modifier.height(Dim.btnH(selected))
-    ) { Text(label) }
-}
-
-
-@Composable
-internal fun CenterText(msg: String) = Box(
-    Modifier.fillMaxSize(), contentAlignment = Alignment.Center
-) { Text(msg) }

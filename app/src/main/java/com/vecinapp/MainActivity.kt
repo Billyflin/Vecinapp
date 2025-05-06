@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
             var darkMode by remember { mutableStateOf(initDark) }
             var dynamicColor by remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) }
             var seniorMode by remember { mutableStateOf(false) }
+            var isFirstTime by remember { mutableStateOf(true) }
 
             // Escucha continua de DataStore
             LaunchedEffect(Unit) {
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
                     darkMode = p.darkMode
                     dynamicColor = p.dynamicColor
                     seniorMode = p.isSenior
+                    isFirstTime = p.isFirstTime
                 }
             }
 
@@ -92,7 +94,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                 }, bottomBar = {
-                    if (showMainBars && !seniorMode) {
+                    if (showMainBars && !seniorMode && !isFirstTime) {
                         BottomNavigationBar(navController, user)
                     }
                 }) { innerPadding ->
@@ -107,6 +109,7 @@ class MainActivity : ComponentActivity() {
                                 isSenior = seniorMode,
                                 darkMode = darkMode,
                                 dynamicColors = dynamicColor,
+                                isFirstTime = isFirstTime,
                                 onSeniorChange = { value ->
                                     lifecycleScope.launch { prefs.updateIsSenior(value) }
                                 },

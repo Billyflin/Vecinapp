@@ -50,12 +50,14 @@ import com.vecinapp.ScreenSugerencias
 
 @Composable
 fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(146.dp)
             .padding(bottom = 70.dp)
             .background(Color.Transparent), contentAlignment = Alignment.BottomCenter
+
     ) {
         Surface(
             shape = RoundedCornerShape(percent = 20),
