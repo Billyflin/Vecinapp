@@ -1,7 +1,7 @@
 package com.vecinapp
 
-// Rutas serializables
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -45,18 +45,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // 1️⃣ Leemos sincrónicamente la primera emisión de DataStore
         val prefs = PreferencesManager(applicationContext)
+
         val initial = runBlocking { prefs.preferencesFlow.first() }
 
+
+
         setContent {
-            // 2️⃣ Inicializamos estados a partir de esos valores
-            var darkMode by remember { mutableStateOf(initial.darkMode) }
             var dynamicColor by remember { mutableStateOf(initial.dynamicColor) }
+            var darkMode by remember { mutableStateOf(initial.darkMode) }
             var seniorMode by remember { mutableStateOf(initial.isSenior) }
             var isFirstTime by remember { mutableStateOf(initial.isFirstTime) }
 
-            // 3️⃣ Seguimos escuchando DataStore para cambios posteriores
+            // Escucha continua de DataStore
             LaunchedEffect(Unit) {
                 prefs.preferencesFlow.collectLatest { p ->
                     darkMode = p.darkMode
@@ -65,12 +66,12 @@ class MainActivity : ComponentActivity() {
                     isFirstTime = p.isFirstTime
                 }
             }
-
+            Log.e("dsada", isFirstTime.toString())
             VecinappTheme(darkTheme = darkMode, dynamicColor = dynamicColor) {
                 val navController = rememberNavController()
                 var user by remember { mutableStateOf(Firebase.auth.currentUser) }
 
-                // Listener de autenticación en FirebaseAuth
+                // Listener de auth
                 DisposableEffect(Unit) {
                     val listener =
                         FirebaseAuth.AuthStateListener { auth -> user = auth.currentUser }
@@ -78,7 +79,9 @@ class MainActivity : ComponentActivity() {
                     onDispose { Firebase.auth.removeAuthStateListener(listener) }
                 }
 
-                // Determinamos si mostramos la barra inferior
+                // Sólo mostramos barra inferior si:
+                // • no es modo senior
+                // • ¡y! ya pasó el onboarding (isFirstTime == false)
                 val showBottomBar = !seniorMode && !isFirstTime
 
                 Scaffold(
@@ -104,83 +107,74 @@ class MainActivity : ComponentActivity() {
                             BottomNavigationBar(navController, user)
                         }
                     }
-                ) { innerPadding ->
-                    Box(Modifier.padding(innerPadding)) {
-                        when {
-                            // 1) Sin sesión: login
-                            user == null -> {
-                                LoginScreen {
-                                    // Después del login, vamos a onboarding o dashboard
-                                    if (isFirstTime) {
-                                        navController.navigate(ScreenOnboarding)
-                                    } else {
-                                        navController.navigate(ScreenDashboard)
-                                    }
+                ) { inner ->
+                    Box(Modifier.padding(inner)) {
+                        // 1) Si no hay user: login
+                        if (user == null) {
+                            LoginScreen {
+                                // tras login por Google o SMS navegamos al onboarding o al dashboard si ya no es primera vez
+                                if (isFirstTime) {
+                                    navController.navigate(ScreenOnboarding)
+                                } else {
+                                    navController.navigate(ScreenDashboard)
                                 }
                             }
-                            // 2) Primera vez tras login: onboarding
-                            isFirstTime -> {
-                                OnboardingModeScreen(
-                                    onFirstTimeChange = { v ->
-                                        lifecycleScope.launch {
-                                            prefs.updateIsFirstTime(v)
-                                        }
-                                        isFirstTime = v
-                                    },
-                                    onSeniorChange = { v ->
-                                        lifecycleScope.launch {
-                                            prefs.updateIsSenior(v)
-                                        }
-                                        seniorMode = v
-                                    },
-                                    onContinue = {
-                                        lifecycleScope.launch {
-                                            prefs.updateIsFirstTime(false)
-                                        }
-                                        isFirstTime = false
-                                        navController.navigate(ScreenDashboard) {
-                                            popUpTo(ScreenOnboarding) { inclusive = true }
-                                        }
+
+                            // 2) Si hay user y es primera vez: onboarding
+                        } else if (isFirstTime) {
+                            OnboardingModeScreen(
+                                onFirstTimeChange = { v ->
+                                    lifecycleScope.launch { prefs.updateIsFirstTime(v) }
+                                },
+                                onSeniorChange = { v ->
+                                    lifecycleScope.launch { prefs.updateIsSenior(v) }
+                                },
+                                onContinue = {
+                                    // al pulsar continuar:
+                                    lifecycleScope.launch { prefs.updateIsFirstTime(false) }
+                                    navController.navigate(ScreenDashboard) {
+                                        popUpTo(ScreenOnboarding) { inclusive = true }
                                     }
-                                )
-                            }
-                            // 3) Modo principal
-                            else -> {
-                                VecinalNavHost(
-                                    navController = navController,
-                                    modifier = Modifier.padding(innerPadding),
-                                    isSenior = seniorMode,
-                                    darkMode = darkMode,
-                                    dynamicColors = dynamicColor,
-                                    isFirstTime = isFirstTime,
-                                    onSeniorChange = { v ->
-                                        lifecycleScope.launch { prefs.updateIsSenior(v) }
-                                        seniorMode = v
-                                    },
-                                    onDarkChange = { v ->
-                                        lifecycleScope.launch { prefs.updateDarkMode(v) }
-                                        darkMode = v
-                                    },
-                                    onDynamicChange = { v ->
-                                        lifecycleScope.launch { prefs.updateDynamicColor(v) }
-                                        dynamicColor = v
-                                    },
-                                    onFirstTimeChange = { v ->
-                                        lifecycleScope.launch { prefs.updateIsFirstTime(v) }
-                                        isFirstTime = v
-                                    },
-                                    onLoggedOut = {
-                                        // Al cerrar sesión, limpiamos y volvemos al login
-                                        lifecycleScope.launch { prefs.updateIsFirstTime(true) }
-                                        Firebase.auth.signOut()
-                                        user = null
-                                        navController.popBackStack(
-                                            ScreenOnboarding,
-                                            inclusive = false
+                                }
+                            )
+
+                            // 3) Ya pasó onboarding, mostramos el nav host normal
+                        } else {
+                            VecinalNavHost(
+                                navController = navController,
+                                modifier = Modifier.padding(inner),
+                                isSenior = seniorMode,
+                                darkMode = darkMode,
+                                dynamicColors = dynamicColor,
+                                isFirstTime = isFirstTime,
+                                onSeniorChange = { v ->
+                                    lifecycleScope.launch {
+                                        prefs.updateIsSenior(
+                                            v
                                         )
                                     }
-                                )
-                            }
+                                },
+                                onDarkChange = { v -> lifecycleScope.launch { prefs.updateDarkMode(v) } },
+                                onDynamicChange = { v ->
+                                    lifecycleScope.launch {
+                                        prefs.updateDynamicColor(
+                                            v
+                                        )
+                                    }
+                                },
+                                onFirstTimeChange = { v ->
+                                    lifecycleScope.launch {
+                                        prefs.updateIsFirstTime(
+                                            v
+                                        )
+                                    }
+                                },
+                                onLoggedOut = {
+                                    // al cerrar sesión, limpiamos el backstack y volvemos al login
+                                    navController.popBackStack(ScreenOnboarding, inclusive = false)
+                                    user = null
+                                }
+                            )
                         }
                     }
                 }

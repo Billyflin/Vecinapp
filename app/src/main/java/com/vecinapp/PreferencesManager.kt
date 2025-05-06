@@ -1,6 +1,7 @@
 package com.vecinapp
 
 import android.content.Context
+import android.os.Build
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
@@ -22,7 +23,8 @@ class PreferencesManager(context: Context) {
     val preferencesFlow: Flow<UserPreferences> = dataStore.data
         .map { preferences ->
             val darkMode = preferences[DARK_MODE_KEY] ?: false
-            val dynamicColor = preferences[DYNAMIC_COLOR_KEY] ?: false
+            val dynamicColor =
+                preferences[DYNAMIC_COLOR_KEY] ?: (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             val isSenior = preferences[IS_SENIOR_KEY] ?: false
             val isFirstTime = preferences[IS_FIRST_TIME_KEY] ?: true
             UserPreferences(darkMode, dynamicColor, isSenior, isFirstTime)
