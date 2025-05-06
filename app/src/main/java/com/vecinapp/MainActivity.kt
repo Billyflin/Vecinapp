@@ -83,7 +83,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                 }, bottomBar = {
-                    if (showBottomBar) {
+                    if (showBottomBar && user != null) {
                         BottomNavigationBar(navController, user)
                     }
                 }) { inner ->
