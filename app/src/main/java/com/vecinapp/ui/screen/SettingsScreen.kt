@@ -4,10 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -18,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
@@ -28,41 +32,44 @@ import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
 
-/* …imports… */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    isSenior      : Boolean,
-    darkMode      : Boolean,
-    dynamicColors : Boolean,
-    onSeniorChange: suspend (Boolean) -> Unit,
-    onDarkChange  : suspend (Boolean) -> Unit,
-    onDynamicChange: suspend (Boolean) -> Unit,
-    onBack        : () -> Unit,
-    onLoggedOut   : () -> Unit = {},
+    isSenior        : Boolean,
+    darkMode        : Boolean,
+    dynamicColors   : Boolean,
+    onSeniorChange  : suspend (Boolean) -> Unit,
+    onDarkChange    : suspend (Boolean) -> Unit,
+    onDynamicChange : suspend (Boolean) -> Unit,
+    onLinkPhone     : () -> Unit,       // ← callback para iniciar flujo de vinculación
+    onBack          : () -> Unit,
+    onLoggedOut     : () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    val user = Firebase.auth.currentUser
+    val phone = user?.phoneNumber
 
     Scaffold(
         topBar = {
-            TopAppBar(
+           if (isSenior) TopAppBar(
                 title = { Text("Ajustes") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
                     }
                 }
             )
         }
     ) { padd ->
         Column(
-            Modifier.padding(padd).padding(16.dp),
+            Modifier
+                .padding(padd)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(28.dp)
         ) {
             /* ─── Apariencia ─── */
             Text("Apariencia", style = MaterialTheme.typography.titleMedium)
 
-            // Dark mode
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Tema oscuro", Modifier.weight(1f))
                 Switch(
@@ -70,7 +77,6 @@ fun SettingsScreen(
                     onCheckedChange = { scope.launch { onDarkChange(it) } }
                 )
             }
-            // Dynamic color
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Color dinámico (Monet)", Modifier.weight(1f))
                 Switch(
@@ -84,25 +90,52 @@ fun SettingsScreen(
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
-                    onClick  = { scope.launch { onSeniorChange(true) } },
-                    enabled  = !isSenior, modifier = Modifier.weight(1f)
+                    onClick = { scope.launch { onSeniorChange(true) } },
+                    enabled = !isSenior,
+                    modifier = Modifier.weight(1f)
                 ) { Text("Senior") }
 
                 Button(
-                    onClick  = { scope.launch { onSeniorChange(false) } },
-                    enabled  = isSenior,  modifier = Modifier.weight(1f)
+                    onClick = { scope.launch { onSeniorChange(false) } },
+                    enabled = isSenior,
+                    modifier = Modifier.weight(1f)
                 ) { Text("Normal") }
+            }
+
+            /* ─── Cuenta / Teléfono ─── */
+            Text("Cuenta", style = MaterialTheme.typography.titleMedium)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Call, contentDescription = null)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = phone ?: "No has vinculado un teléfono",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    TextButton(onClick = onLinkPhone) {
+                        Text(
+                            if (phone != null) "Actualizar teléfono"
+                            else "Vincular teléfono"
+                        )
+                    }
+                }
             }
 
             /* ─── Cerrar sesión ─── */
             Button(
                 onClick = { Firebase.auth.signOut(); onLoggedOut() },
-                colors  = ButtonDefaults.buttonColors(
+                colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error,
                     contentColor   = MaterialTheme.colorScheme.onError
                 )
             ) {
-                Icon(Icons.Default.Logout, null); Spacer(Modifier.width(8.dp)); Text("Cerrar sesión")
+                Icon(Icons.Default.Logout, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Cerrar sesión")
             }
         }
     }

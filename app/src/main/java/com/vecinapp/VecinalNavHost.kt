@@ -1,50 +1,59 @@
 package com.vecinapp
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.vecinapp.ui.screen.*
+import com.google.firebase.auth.PhoneAuthProvider
+import com.vecinapp.ui.screen.AnunciosScreen
+import com.vecinapp.ui.screen.DashboardScreen
+import com.vecinapp.ui.screen.EventDetailScreen
+import com.vecinapp.ui.screen.EventosListScreen
 import com.vecinapp.ui.screen.OnboardingModeScreen
+import com.vecinapp.ui.screen.OtpVerificationScreen
+import com.vecinapp.ui.screen.PanelDirectivoScreen
+import com.vecinapp.ui.screen.ProfileCompletionScreen
+import com.vecinapp.ui.screen.RegisterScreenMobile
 import com.vecinapp.ui.screen.SettingsScreen
 import com.vecinapp.ui.screen.SugerenciasListScreen
+import com.vecinapp.ui.screen.TablonListScreen
 import kotlinx.serialization.Serializable
 
-/* -------------------------------------------------------------
- *  Navigation type‑safe con rutas @Serializable
- * ----------------------------------------------------------- */
 @Composable
 fun VecinalNavHost(
-    /*NavController externo (para pruebas o previews) */
+    /* NavController externo (para pruebas o previews) */
     navController: NavHostController = rememberNavController(),
 
     /* Layout modifier que llega desde el Scaffold */
     modifier: Modifier = Modifier,
 
-    /* ---------- Preferencias actuales ---------- */
-    isSenior: Boolean,
-    darkMode: Boolean,
-    dynamicColors: Boolean,
+    /* Preferencias actuales */
+    isSenior      : Boolean,
+    darkMode      : Boolean,
+    dynamicColors : Boolean,
 
-    /* ---------- Callbacks para actualizarlas (DataStore) ------ */
-    onSeniorChange: suspend (Boolean) -> Unit,
-    onDarkChange: suspend (Boolean) -> Unit,
-    onDynamicChange: suspend (Boolean) -> Unit,
+    /* Callbacks para actualizarlas (DataStore) */
+    onSeniorChange  : suspend (Boolean) -> Unit,
+    onDarkChange    : suspend (Boolean) -> Unit,
+    onDynamicChange : suspend (Boolean) -> Unit,
 
-    /* ---------- Sesión ---------- */
-    onLoggedOut: () -> Unit,
+    /* Sesión */
+    onLoggedOut : () -> Unit,
 ) {
-
     NavHost(
-        navController = navController,
+        navController    = navController,
         startDestination = ScreenOnboarding,
-        modifier = modifier
+        modifier         = modifier
     ) {
 
-        /* -------- Onboarding – elegir modo visual -------- */
+        /* Onboarding – elegir modo visual */
         composable<ScreenOnboarding> {
             OnboardingModeScreen { senior ->
                 // guardamos la elección y continuamos
@@ -54,76 +63,115 @@ fun VecinalNavHost(
             }
         }
 
+        composable<ScreenRegisterPhone> {
+            var verificationId by remember { mutableStateOf<String?>(null) }
+            var resendToken    by remember { mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null) }
 
-        /* --------------  Anuncios  ----------------------- */
-        composable<ScreenAnuncios> { AnunciosScreen() }
-
-        /* --------------  Eventos  ------------------------ */
-        composable<ScreenEventos> {
-            EventosListScreen {
-                navController.navigate(ScreenEventoDetail(eventId = "1"))
+            if (verificationId == null) {
+                RegisterScreenMobile(
+                    forceResendingToken = null,
+                    onVerificationSent = { id, token ->
+                        verificationId = id
+                        resendToken    = token
+                    }
+                )
+            } else {
+                OtpVerificationScreen(
+                    verificationId        = verificationId!!,
+                    forceResendingToken   = resendToken,
+                    onVerified            = {
+                        navController.navigate(ScreenProfileCompletion) {
+                            popUpTo(ScreenRegisterPhone) { inclusive = true }
+                        }
+                    },
+                    onResend              = {
+                        // reenvío usando el token que guardamos
+                        verificationId = null
+                    }
+                )
             }
         }
-        composable<ScreenEventoDetail> { backStackEntry ->
-            val args = backStackEntry.toRoute<ScreenEventoDetail>()
-            EventDetailScreen(
-                title = "Evento ${args.eventId}",
-                dateTime = "24 MAY 13:00‑18:00",
-                description = "Detalles del evento…",
-                organizer = "Rosita",
-                phone = "+56 9 1234 5678",
-                lat = -33.45,
-                lon = -70.66,
-                isSenior = isSenior
+
+
+
+        /* Completar datos de perfil tras OTP */
+        composable<ScreenProfileCompletion> {
+            ProfileCompletionScreen(
+                onComplete = {
+                    // una vez completado el perfil, vamos al dashboard
+                    navController.navigate(ScreenDashboard) {
+                        popUpTo(ScreenRegisterPhone) { inclusive = true }
+                    }
+                }
             )
         }
-        /* ---------- DASHBOARD (normal o senior) ---------------- */
+
+        /* Dashboard (normal o senior) */
         composable<ScreenDashboard> {
             DashboardScreen(
-                isSenior = isSenior,
+                isSenior   = isSenior,
                 onNavigate = { dest -> navController.navigate(dest) }
             )
         }
 
+        /* Anuncios */
+        composable<ScreenAnuncios> {
+            AnunciosScreen()
+        }
 
-        /* -----------  Más módulos / stubs  --------------- */
+        /* Eventos */
+        composable<ScreenEventos> {
+            EventosListScreen {
+                navController.navigate(ScreenEventoDetail(eventId = it.toString()))
+            }
+        }
+        composable<ScreenEventoDetail> { backEntry ->
+            val args = backEntry.toRoute<ScreenEventoDetail>()
+            EventDetailScreen(
+                title       = "Evento ${args.eventId}",
+                dateTime    = "24 MAY 13:00–18:00",
+                description = "Detalles del evento…",
+                organizer   = "Rosita",
+                phone       = "+56 9 1234 5678",
+                lat         = -33.45,
+                lon         = -70.66,
+                isSenior    = isSenior,
+                onBack      = { navController.popBackStack() }
+            )
+        }
+
+        /* Sugerencias, Tablón y Panel Directivo */
         composable<ScreenSugerencias> { SugerenciasListScreen() }
-        composable<ScreenTablon> { TablonListScreen() }
-        composable<ScreenPanel> { PanelDirectivoScreen() }
+        composable<ScreenTablon>      { TablonListScreen()      }
+        composable<ScreenPanel>       { PanelDirectivoScreen()  }
 
-        /* ---------------- Ajustes ------------------------ */
+        /* Ajustes */
         composable<ScreenSettings> {
             SettingsScreen(
-                isSenior = isSenior,
-                darkMode = darkMode,
-                dynamicColors = dynamicColors,
-                onSeniorChange = onSeniorChange,
-                onDarkChange = onDarkChange,
+                isSenior        = isSenior,
+                darkMode        = darkMode,
+                dynamicColors   = dynamicColors,
+                onSeniorChange  = onSeniorChange,
+                onDarkChange    = onDarkChange,
                 onDynamicChange = onDynamicChange,
-                onBack = { navController.popBackStack() },
-                onLoggedOut = onLoggedOut
+                onLinkPhone     = { navController.navigate(ScreenRegisterPhone) },
+                onBack          = { navController.popBackStack() },
+                onLoggedOut     = onLoggedOut
             )
         }
     }
 }
 
 
-/* -------------------- Rutas serializables -------------------- */
-@Serializable
-object ScreenOnboarding
-@Serializable
-object ScreenDashboard
-@Serializable
-object ScreenAnuncios
-@Serializable
-object ScreenEventos
-@Serializable
-data class ScreenEventoDetail(val eventId: String)
-@Serializable
-object ScreenSugerencias
-@Serializable
-object ScreenTablon
-@Serializable
-object ScreenPanel
-@Serializable
-object ScreenSettings
+/* Rutas serializables */
+@Serializable object ScreenOnboarding
+@Serializable object ScreenRegisterPhone
+@Serializable object ScreenProfileCompletion   // ← nueva ruta
+@Serializable object ScreenDashboard
+@Serializable object ScreenAnuncios
+@Serializable object ScreenEventos
+@Serializable data class ScreenEventoDetail(val eventId: String)
+@Serializable object ScreenSugerencias
+@Serializable object ScreenTablon
+@Serializable object ScreenPanel
+@Serializable object ScreenSettings
