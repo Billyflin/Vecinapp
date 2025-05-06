@@ -7,15 +7,10 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
-import com.vecinapp.ui.AnunciosScreen
-import com.vecinapp.ui.DashboardScreen
-import com.vecinapp.ui.EventosListScreen
-import com.vecinapp.ui.OnboardingModeScreen
-import com.vecinapp.ui.PanelDirectivoScreen
-import com.vecinapp.ui.SugerenciasListScreen
-import com.vecinapp.ui.TablonListScreen
-import com.vecinapp.ui.screen.EventDetailScreen
+import com.vecinapp.ui.screen.*
+import com.vecinapp.ui.screen.OnboardingModeScreen
 import com.vecinapp.ui.screen.SettingsScreen
+import com.vecinapp.ui.screen.SugerenciasListScreen
 import kotlinx.serialization.Serializable
 
 /* -------------------------------------------------------------
@@ -23,10 +18,10 @@ import kotlinx.serialization.Serializable
  * ----------------------------------------------------------- */
 @Composable
 fun VecinalNavHost(
-    /** NavController externo (para pruebas o previews) */
+    /*NavController externo (para pruebas o previews) */
     navController: NavHostController = rememberNavController(),
 
-    /** Layout modifier que llega desde el Scaffold */
+    /* Layout modifier que llega desde el Scaffold */
     modifier: Modifier = Modifier,
 
     /* ---------- Preferencias actuales ---------- */
