@@ -18,8 +18,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Diversity3
+import androidx.compose.material.icons.filled.EditLocationAlt
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.rounded.Map
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,7 +42,10 @@ import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseUser
+import com.vecinapp.ScreenAnuncios
+import com.vecinapp.ScreenEventos
 import com.vecinapp.ScreenSettings
+import com.vecinapp.ScreenSugerencias
 
 
 @Composable
@@ -51,8 +55,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
             .fillMaxWidth()
             .height(146.dp)
             .padding(bottom = 70.dp)
-            .background(Color.Transparent),
-        contentAlignment = Alignment.BottomCenter
+            .background(Color.Transparent), contentAlignment = Alignment.BottomCenter
     ) {
         Surface(
             shape = RoundedCornerShape(percent = 20),
@@ -71,10 +74,10 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                 // Botón 1
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = {
-//                        navController.navigate(ScreenMap) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
+                        navController.navigate(ScreenAnuncios) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
                     }) {
                         Icon(
                             imageVector = Icons.Rounded.Map,
@@ -83,16 +86,16 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                             modifier = Modifier.size(30.dp)
                         )
                     }
-                    Text("Inicio", style = MaterialTheme.typography.bodySmall)
+                    Text("Sugerencias", style = MaterialTheme.typography.bodySmall)
                 }
 
                 // Botón 2
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = {
-//                        navController.navigate(ScreenHistory) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
+                        navController.navigate(ScreenEventos) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
                     }) {
                         Icon(
                             Icons.Default.DateRange,
@@ -101,7 +104,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                             modifier = Modifier.size(30.dp)
                         )
                     }
-                    Text("Historial", style = MaterialTheme.typography.bodySmall)
+                    Text("Eventos", style = MaterialTheme.typography.bodySmall)
                 }
 
                 Spacer(modifier = Modifier.width(30.dp))
@@ -109,14 +112,14 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                 // Botón 3
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     IconButton(onClick = {
-//                        navController.navigate(ScreenRewards) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
+                        navController.navigate(ScreenSugerencias) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
                     }) {
                         Icon(
-                            Icons.Default.Star,
-                            contentDescription = "Recompensas",
+                            Icons.Default.EditLocationAlt,
+                            contentDescription = "Inicio",
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(30.dp)
                         )
@@ -136,9 +139,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                         if (user?.photoUrl != null) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(user.photoUrl)
-                                    .crossfade(true)
-                                    .build(),
+                                    .data(user.photoUrl).crossfade(true).build(),
                                 contentScale = ContentScale.Crop,
                                 contentDescription = "Foto de perfil",
                                 modifier = Modifier
@@ -161,7 +162,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
 
         FloatingActionButton(
             onClick = {
-//                navController.navigate(ScreenQrScanner)
+                navController.navigate(ScreenEventos)
             },
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = MaterialTheme.colorScheme.onPrimary,
@@ -169,6 +170,12 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
                 .align(Alignment.TopCenter)
                 .offset(y = (-18).dp)
         ) {
+            Icon(
+                imageVector = Icons.Filled.Diversity3,
+                contentDescription = "Comunidad",
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(36.dp)
+            )
         }
     }
 }

@@ -3,6 +3,7 @@ package com.vecinapp.ui.screen
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -10,10 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -21,15 +19,17 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EventosListScreen(onEventClick: () -> Unit) {
-    Scaffold(topBar = { CenterAlignedTopAppBar({ Text("Eventos") }) }) { padd ->
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+
+        Text("Próximos eventos", style = MaterialTheme.typography.titleLarge)
         LazyColumn(
-            Modifier
-                .padding(padd)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             items(4) { idx ->
                 EventCard(
@@ -46,15 +46,9 @@ fun EventosListScreen(onEventClick: () -> Unit) {
 
 @Composable
 private fun EventCard(
-    title: String,
-    date: String,
-    time: String,
-    img: String,
-    onClick: () -> Unit
+    title: String, date: String, time: String, img: String, onClick: () -> Unit
 ) = Card(
-    onClick,
-    shape = RoundedCornerShape(16.dp),
-    colors = CardDefaults.elevatedCardColors()
+    onClick, shape = RoundedCornerShape(16.dp), colors = CardDefaults.elevatedCardColors()
 ) {
     AsyncImage(
         model = img,
