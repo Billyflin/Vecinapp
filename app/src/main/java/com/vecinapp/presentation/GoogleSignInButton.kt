@@ -26,18 +26,18 @@ fun GoogleSignInButton(
     theme: GoogleButtonTheme = if (isSystemInDarkTheme()) GoogleButtonTheme.Dark else GoogleButtonTheme.Light,
     colors: ButtonColors = ButtonDefaults.buttonColors(
         containerColor = when (theme) {
-            GoogleButtonTheme.Light   -> Color.White
-            GoogleButtonTheme.Dark    -> Color(0xFF131314)
+            GoogleButtonTheme.Light -> Color.White
+            GoogleButtonTheme.Dark -> Color(0xFF131314)
             GoogleButtonTheme.Neutral -> Color(0xFFF2F2F2)
         },
         contentColor = when (theme) {
             GoogleButtonTheme.Dark -> Color(0xFFE3E3E3)
-            else                   -> Color(0xFF1F1F1F)
+            else -> Color(0xFF1F1F1F)
         }
     ),
     border: BorderStroke? = when (theme) {
         GoogleButtonTheme.Light -> BorderStroke(1.dp, Color(0xFF747775))
-        GoogleButtonTheme.Dark  -> BorderStroke(1.dp, Color(0xFF8E918F))
+        GoogleButtonTheme.Dark -> BorderStroke(1.dp, Color(0xFF8E918F))
         GoogleButtonTheme.Neutral -> null
     },
     iconSize: Int = 38         // 24‑48 dp recomendado por Google

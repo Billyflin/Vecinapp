@@ -49,13 +49,21 @@ fun RegisterScreenMobile(
                 // auto‐verificado
                 Firebase.auth.signInWithCredential(credential)
                     .addOnFailureListener {
-                        Toast.makeText(context, "Auto-login falló: ${it.localizedMessage}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(
+                            context,
+                            "Auto-login falló: ${it.localizedMessage}",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
             }
 
             override fun onVerificationFailed(e: FirebaseException) {
                 Log.e("PhoneAuth", "Error verificación: ${e.message}")
-                Toast.makeText(context, "Error verificación: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(
+                    context,
+                    "Error verificación: ${e.localizedMessage}",
+                    Toast.LENGTH_LONG
+                ).show()
             }
 
             override fun onCodeSent(

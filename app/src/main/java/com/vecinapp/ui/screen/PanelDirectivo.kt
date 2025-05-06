@@ -4,4 +4,4 @@ import androidx.compose.runtime.Composable
 import com.vecinapp.ui.CenterText
 
 @Composable
-fun PanelDirectivoScreen()  = CenterText("Panel directivo (stub)")
+fun PanelDirectivoScreen() = CenterText("Panel directivo (stub)")

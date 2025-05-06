@@ -46,13 +46,13 @@ fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
 
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             ModeSwitchButton("Estándar", !senior, onClick = { senior = false })
-            ModeSwitchButton("Senior",   senior,  onClick = { senior = true  })
+            ModeSwitchButton("Senior", senior, onClick = { senior = true })
         }
 
         Button(
-            onClick  = { onSelect(senior) },
+            onClick = { onSelect(senior) },
             modifier = Modifier.fillMaxWidth(.6f),
-            shape    = RoundedCornerShape(24.dp)
+            shape = RoundedCornerShape(24.dp)
         ) { Text("Continuar") }
     }
 }

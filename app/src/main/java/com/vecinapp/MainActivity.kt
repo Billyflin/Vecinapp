@@ -48,16 +48,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             /* -------- estado de preferencias -------- */
             val initDark = isSystemInDarkTheme()
-            var darkMode      by remember { mutableStateOf(initDark) }
-            var dynamicColor  by remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) }
-            var seniorMode    by remember { mutableStateOf(false) }
+            var darkMode by remember { mutableStateOf(initDark) }
+            var dynamicColor by remember { mutableStateOf(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) }
+            var seniorMode by remember { mutableStateOf(false) }
 
             // Escucha continua del DataStore
             LaunchedEffect(Unit) {
                 prefs.preferencesFlow.collectLatest {
-                    darkMode     = it.darkMode
+                    darkMode = it.darkMode
                     dynamicColor = it.dynamicColor
-                    seniorMode   = it.isSenior
+                    seniorMode = it.isSenior
                 }
             }
 
@@ -86,7 +86,9 @@ class MainActivity : ComponentActivity() {
                                         painter = painterResource(R.drawable.icon_only),
                                         contentDescription = null,
                                         colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
-                                        modifier = Modifier.size(48.dp).padding(8.dp)
+                                        modifier = Modifier
+                                            .size(48.dp)
+                                            .padding(8.dp)
                                     )
                                 }
                             )
@@ -94,19 +96,19 @@ class MainActivity : ComponentActivity() {
                         bottomBar = { if (!seniorMode) BottomNavigationBar(nav, user) }
                     ) { inner ->
                         VecinalNavHost(
-                            navController   = nav,
-                            modifier        = Modifier.padding(inner),
+                            navController = nav,
+                            modifier = Modifier.padding(inner),
 
                             /* ----------  preferencias  ---------- */
-                            isSenior        = seniorMode,
-                            darkMode        = darkMode,          //  ←  faltaba
-                            dynamicColors   = dynamicColor,      //  ←  faltaba
+                            isSenior = seniorMode,
+                            darkMode = darkMode,          //  ←  faltaba
+                            dynamicColors = dynamicColor,      //  ←  faltaba
 
                             /* ---------- callbacks  ---------- */
-                            onSeniorChange  = { value ->
+                            onSeniorChange = { value ->
                                 lifecycleScope.launch { prefs.updateIsSenior(value) }
                             },
-                            onDarkChange    = { value ->
+                            onDarkChange = { value ->
                                 lifecycleScope.launch { prefs.updateDarkMode(value) }
                             },
                             onDynamicChange = { value ->
@@ -114,7 +116,7 @@ class MainActivity : ComponentActivity() {
                             },
 
                             /* ---------- sesión  ---------- */
-                            onLoggedOut     = {
+                            onLoggedOut = {
                                 nav.popBackStack(ScreenOnboarding, inclusive = false)
                             }
                         )

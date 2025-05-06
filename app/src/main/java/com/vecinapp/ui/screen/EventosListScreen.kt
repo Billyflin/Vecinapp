@@ -34,9 +34,9 @@ fun EventosListScreen(onEventClick: () -> Unit) {
             items(4) { idx ->
                 EventCard(
                     title = "Convivencia vecinal",
-                    date  = "10 JUN",
-                    time  = "11:00 – 14:00",
-                    img   = "https://picsum.photos/400?$idx",
+                    date = "10 JUN",
+                    time = "11:00 – 14:00",
+                    img = "https://picsum.photos/400?$idx",
                     onClick = onEventClick
                 )
             }
@@ -47,13 +47,13 @@ fun EventosListScreen(onEventClick: () -> Unit) {
 @Composable
 private fun EventCard(
     title: String,
-    date : String,
-    time : String,
-    img  : String,
+    date: String,
+    time: String,
+    img: String,
     onClick: () -> Unit
 ) = Card(
     onClick,
-    shape  = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.elevatedCardColors()
 ) {
     AsyncImage(

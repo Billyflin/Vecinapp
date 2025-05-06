@@ -174,7 +174,6 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
 }
 
 
-
 @Preview
 @Composable
 fun NavBarPreview() {

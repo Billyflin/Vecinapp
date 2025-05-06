@@ -4,4 +4,4 @@ import androidx.compose.runtime.Composable
 import com.vecinapp.ui.CenterText
 
 @Composable
-fun TablonListScreen()      = CenterText("Tablón (stub)")
+fun TablonListScreen() = CenterText("Tablón (stub)")

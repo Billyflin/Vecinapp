@@ -5,4 +5,4 @@ import com.vecinapp.ui.CenterText
 
 
 @Composable
-fun AnunciosScreen()        = CenterText("Próximamente anuncios")
+fun AnunciosScreen() = CenterText("Próximamente anuncios")

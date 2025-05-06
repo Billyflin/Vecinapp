@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Notifications
@@ -41,7 +41,7 @@ import com.vecinapp.ui.Dim
 
 @Composable
 fun DashboardScreen(
-    isSenior : Boolean,
+    isSenior: Boolean,
     onNavigate: (Any) -> Unit
 ) {
     if (isSenior) {
@@ -58,10 +58,10 @@ fun DashboardScreen(
 private fun SeniorDashboard(onNavigate: (Any) -> Unit) {
 
     val modules = listOf(
-        Triple("Anuncios",    Icons.Default.Notifications, ScreenAnuncios),
-        Triple("Eventos",     Icons.Default.Event,         ScreenEventos),
-        Triple("Sugerencias", Icons.Default.Lightbulb,     ScreenSugerencias),
-        Triple("Tablón",      Icons.Default.Chat,          ScreenTablon)
+        Triple("Anuncios", Icons.Default.Notifications, ScreenAnuncios),
+        Triple("Eventos", Icons.Default.Event, ScreenEventos),
+        Triple("Sugerencias", Icons.Default.Lightbulb, ScreenSugerencias),
+        Triple("Tablón", Icons.AutoMirrored.Filled.Chat, ScreenTablon)
     )
 
     LazyColumn(
@@ -86,8 +86,8 @@ private fun SeniorDashboard(onNavigate: (Any) -> Unit) {
 /* ---------- grid helper ---------- */
 @Composable
 private fun Grid2x2(
-    items   : List<Triple<String, ImageVector, Any>>,
-    onClick : (Any) -> Unit
+    items: List<Triple<String, ImageVector, Any>>,
+    onClick: (Any) -> Unit
 ) {
     Column {
         items.chunked(2).forEach { row ->
@@ -107,30 +107,31 @@ private fun Grid2x2(
 /* ---------- tarjeta grande reutilizable ---------- */
 @Composable
 private fun LargeCard(
-    title   : String,
-    icon    : ImageVector,
+    title: String,
+    icon: ImageVector,
     modifier: Modifier = Modifier,
-    onClick : () -> Unit
+    onClick: () -> Unit
 ) = Card(
     modifier = modifier
         .height(Dim.cardH(true))
         .clip(RoundedCornerShape(16.dp))
         .clickable(onClick = onClick),
-    colors  = CardDefaults.elevatedCardColors(MaterialTheme.colorScheme.primary)
+    colors = CardDefaults.elevatedCardColors(MaterialTheme.colorScheme.primary)
 ) {
     Column(
         Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Icon(icon, null,
-            tint     = MaterialTheme.colorScheme.onPrimary,
+        Icon(
+            icon, null,
+            tint = MaterialTheme.colorScheme.onPrimary,
             modifier = Modifier.size(Dim.icon(true))
         )
         Spacer(Modifier.height(8.dp))
         Text(
             title,
-            color    = MaterialTheme.colorScheme.onPrimary,
+            color = MaterialTheme.colorScheme.onPrimary,
             fontSize = Dim.text(true),
             fontWeight = FontWeight.SemiBold
         )

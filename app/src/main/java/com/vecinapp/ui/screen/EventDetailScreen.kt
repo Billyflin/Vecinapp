@@ -16,12 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Button
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,8 +40,8 @@ import coil.compose.AsyncImage
 
 /* ───────── helpers rápidos ───────── */
 private fun Float.s(enlarged: Boolean) = if (enlarged) this * 1.25f else this
-private fun Int.dpS(senior: Boolean)   = (this.toFloat().s(senior)).dp
-private fun Int.spS(senior: Boolean)   = (this.toFloat().s(senior)).sp
+private fun Int.dpS(senior: Boolean) = (this.toFloat().s(senior)).dp
+private fun Int.spS(senior: Boolean) = (this.toFloat().s(senior)).sp
 
 /* ────────── UI ───────────────────── */
 @Composable
@@ -57,8 +57,8 @@ fun EventDetailScreen(
     lon: Double
 ) {
     /* tamaños dependientes */
-    val hImg   = 180.dpS(isSenior)
-    val hGap   = 20.dpS(isSenior)
+    val hImg = 180.dpS(isSenior)
+    val hGap = 20.dpS(isSenior)
     val txtBig = 22.spS(isSenior)
     val txtNor = 16.spS(isSenior)
 
@@ -87,7 +87,7 @@ fun EventDetailScreen(
 
             Text(description, fontSize = txtNor)
 
-            Divider()
+            HorizontalDivider()
 
             Text("Organiza:", fontSize = txtNor, color = MaterialTheme.colorScheme.primary)
             InfoRow(Icons.Default.Person, organizer, txtNor)
@@ -122,7 +122,7 @@ fun EventDetailScreen(
                     shape = RoundedCornerShape(50)
                 )
         ) {
-            Icon(Icons.Default.ArrowBack, contentDescription = "Atrás")
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Atrás")
         }
     }
 }

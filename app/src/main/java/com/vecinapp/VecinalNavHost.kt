@@ -35,22 +35,22 @@ fun VecinalNavHost(
     modifier: Modifier = Modifier,
 
     /* Preferencias actuales */
-    isSenior      : Boolean,
-    darkMode      : Boolean,
-    dynamicColors : Boolean,
+    isSenior: Boolean,
+    darkMode: Boolean,
+    dynamicColors: Boolean,
 
     /* Callbacks para actualizarlas (DataStore) */
-    onSeniorChange  : suspend (Boolean) -> Unit,
-    onDarkChange    : suspend (Boolean) -> Unit,
-    onDynamicChange : suspend (Boolean) -> Unit,
+    onSeniorChange: suspend (Boolean) -> Unit,
+    onDarkChange: suspend (Boolean) -> Unit,
+    onDynamicChange: suspend (Boolean) -> Unit,
 
     /* Sesión */
-    onLoggedOut : () -> Unit,
+    onLoggedOut: () -> Unit,
 ) {
     NavHost(
-        navController    = navController,
+        navController = navController,
         startDestination = ScreenOnboarding,
-        modifier         = modifier
+        modifier = modifier
     ) {
 
         /* Onboarding – elegir modo visual */
@@ -65,33 +65,36 @@ fun VecinalNavHost(
 
         composable<ScreenRegisterPhone> {
             var verificationId by remember { mutableStateOf<String?>(null) }
-            var resendToken    by remember { mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null) }
+            var resendToken by remember {
+                mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(
+                    null
+                )
+            }
 
             if (verificationId == null) {
                 RegisterScreenMobile(
                     forceResendingToken = null,
                     onVerificationSent = { id, token ->
                         verificationId = id
-                        resendToken    = token
+                        resendToken = token
                     }
                 )
             } else {
                 OtpVerificationScreen(
-                    verificationId        = verificationId!!,
-                    forceResendingToken   = resendToken,
-                    onVerified            = {
+                    verificationId = verificationId!!,
+                    forceResendingToken = resendToken,
+                    onVerified = {
                         navController.navigate(ScreenProfileCompletion) {
                             popUpTo(ScreenRegisterPhone) { inclusive = true }
                         }
                     },
-                    onResend              = {
+                    onResend = {
                         // reenvío usando el token que guardamos
                         verificationId = null
                     }
                 )
             }
         }
-
 
 
         /* Completar datos de perfil tras OTP */
@@ -109,7 +112,7 @@ fun VecinalNavHost(
         /* Dashboard (normal o senior) */
         composable<ScreenDashboard> {
             DashboardScreen(
-                isSenior   = isSenior,
+                isSenior = isSenior,
                 onNavigate = { dest -> navController.navigate(dest) }
             )
         }
@@ -128,35 +131,35 @@ fun VecinalNavHost(
         composable<ScreenEventoDetail> { backEntry ->
             val args = backEntry.toRoute<ScreenEventoDetail>()
             EventDetailScreen(
-                title       = "Evento ${args.eventId}",
-                dateTime    = "24 MAY 13:00–18:00",
+                title = "Evento ${args.eventId}",
+                dateTime = "24 MAY 13:00–18:00",
                 description = "Detalles del evento…",
-                organizer   = "Rosita",
-                phone       = "+56 9 1234 5678",
-                lat         = -33.45,
-                lon         = -70.66,
-                isSenior    = isSenior,
-                onBack      = { navController.popBackStack() }
+                organizer = "Rosita",
+                phone = "+56 9 1234 5678",
+                lat = -33.45,
+                lon = -70.66,
+                isSenior = isSenior,
+                onBack = { navController.popBackStack() }
             )
         }
 
         /* Sugerencias, Tablón y Panel Directivo */
         composable<ScreenSugerencias> { SugerenciasListScreen() }
-        composable<ScreenTablon>      { TablonListScreen()      }
-        composable<ScreenPanel>       { PanelDirectivoScreen()  }
+        composable<ScreenTablon> { TablonListScreen() }
+        composable<ScreenPanel> { PanelDirectivoScreen() }
 
         /* Ajustes */
         composable<ScreenSettings> {
             SettingsScreen(
-                isSenior        = isSenior,
-                darkMode        = darkMode,
-                dynamicColors   = dynamicColors,
-                onSeniorChange  = onSeniorChange,
-                onDarkChange    = onDarkChange,
+                isSenior = isSenior,
+                darkMode = darkMode,
+                dynamicColors = dynamicColors,
+                onSeniorChange = onSeniorChange,
+                onDarkChange = onDarkChange,
                 onDynamicChange = onDynamicChange,
-                onLinkPhone     = { navController.navigate(ScreenRegisterPhone) },
-                onBack          = { navController.popBackStack() },
-                onLoggedOut     = onLoggedOut
+                onLinkPhone = { navController.navigate(ScreenRegisterPhone) },
+                onBack = { navController.popBackStack() },
+                onLoggedOut = onLoggedOut
             )
         }
     }
@@ -164,14 +167,35 @@ fun VecinalNavHost(
 
 
 /* Rutas serializables */
-@Serializable object ScreenOnboarding
-@Serializable object ScreenRegisterPhone
-@Serializable object ScreenProfileCompletion   // ← nueva ruta
-@Serializable object ScreenDashboard
-@Serializable object ScreenAnuncios
-@Serializable object ScreenEventos
-@Serializable data class ScreenEventoDetail(val eventId: String)
-@Serializable object ScreenSugerencias
-@Serializable object ScreenTablon
-@Serializable object ScreenPanel
-@Serializable object ScreenSettings
+@Serializable
+object ScreenOnboarding
+
+@Serializable
+object ScreenRegisterPhone
+
+@Serializable
+object ScreenProfileCompletion   // ← nueva ruta
+
+@Serializable
+object ScreenDashboard
+
+@Serializable
+object ScreenAnuncios
+
+@Serializable
+object ScreenEventos
+
+@Serializable
+data class ScreenEventoDetail(val eventId: String)
+
+@Serializable
+object ScreenSugerencias
+
+@Serializable
+object ScreenTablon
+
+@Serializable
+object ScreenPanel
+
+@Serializable
+object ScreenSettings

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Notifications
@@ -54,29 +53,30 @@ import com.vecinapp.ScreenTablon
 
 internal object Dim {
     private fun k(senior: Boolean) = if (senior) 1.25f else 1f
-    fun gap  (s: Boolean) = (20 * k(s)).dp
+    fun gap(s: Boolean) = (20 * k(s)).dp
     fun cardH(s: Boolean) = (140 * k(s)).dp
-    fun icon (s: Boolean) = (48 * k(s)).dp
-    fun btnH (s: Boolean) = (56 * k(s)).dp
-    fun text (s: Boolean) = (18 * k(s)).sp
+    fun icon(s: Boolean) = (48 * k(s)).dp
+    fun btnH(s: Boolean) = (56 * k(s)).dp
+    fun text(s: Boolean) = (18 * k(s)).sp
 }
 
 @Composable
 internal fun ModeSwitchButton(
-    label   : String,
+    label: String,
     selected: Boolean,
-    onClick : () -> Unit
+    onClick: () -> Unit
 ) {
-    val bgColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+    val bgColor =
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
     val txtColor by animateColorAsState(
         if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
     )
     Button(
         onClick,
-        shape   = RoundedCornerShape(16.dp),
-        colors  = ButtonDefaults.buttonColors(
+        shape = RoundedCornerShape(16.dp),
+        colors = ButtonDefaults.buttonColors(
             containerColor = bgColor,
-            contentColor   = txtColor
+            contentColor = txtColor
         ),
         modifier = Modifier.height(Dim.btnH(selected))
     ) { Text(label) }
