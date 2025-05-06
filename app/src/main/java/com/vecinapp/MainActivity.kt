@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.ktx.auth
@@ -69,7 +70,10 @@ class MainActivity : ComponentActivity() {
                 onDispose { Firebase.auth.removeAuthStateListener(listener) }
             }
 
-            val showBottomBar = !seniorMode && !isFirstTime
+
+            val backStackEntry by navController.currentBackStackEntryAsState()
+            val currentRoute = backStackEntry?.destination?.route
+
 
             VecinappTheme(darkTheme = darkMode, dynamicColor = dynamicColor) {
                 Scaffold(topBar = {
@@ -83,7 +87,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                 }, bottomBar = {
-                    if (showBottomBar && user != null) {
+                    if (!seniorMode && !isFirstTime && user != null) {
                         BottomNavigationBar(navController, user)
                     }
                 }) { inner ->

@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -94,13 +94,12 @@ fun LoginScreen(
     ) {
         when (val s = step) {
 
-            // 1️⃣ Elección de método
             is LoginStep.Choice -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Image(
-                    painter = painterResource(R.drawable.icon_only),
+                    painter = painterResource(R.drawable.icon_text),
                     contentDescription = "Logo",
                     colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
-                    modifier = Modifier.size(200.dp)
+                    modifier = Modifier.padding(16.dp)
                 )
                 Spacer(Modifier.height(24.dp))
 

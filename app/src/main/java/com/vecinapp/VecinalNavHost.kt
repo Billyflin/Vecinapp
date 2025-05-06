@@ -74,9 +74,7 @@ fun VecinalNavHost(
             }, onSeniorChange = { senior ->
                 onSeniorChange(senior)
             }, onContinue = {
-                navController.navigate(ScreenRegisterPhone) {
-                    popUpTo(ScreenOnboarding) { inclusive = true }
-                }
+                navController.navigate(ScreenRegisterPhone)
             })
         }
 
@@ -104,7 +102,6 @@ fun VecinalNavHost(
                         }
                     },
                     onResend = {
-                        // reenvío usando el token que guardamos
                         verificationId = null
                     })
             }
@@ -191,7 +188,12 @@ object ScreenRegisterPhone
 object ScreenProfileCompletion   // ← nueva ruta
 
 @Serializable
-object ScreenDashboard
+object ScreenDashboard {
+    fun toRoute(): String {
+        return ("com.vecinapp.ScreenDashboard")
+
+    }
+}
 
 @Serializable
 object ScreenAnuncios
