@@ -24,18 +24,13 @@ import com.vecinapp.ui.screen.PanelDirectivoScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
 import com.vecinapp.ui.screen.RegisterScreenMobile
 import com.vecinapp.ui.screen.SettingsScreen
-
 import com.vecinapp.ui.screen.SugerenciasListScreen
 import com.vecinapp.ui.screen.TablonListScreen
 import kotlinx.serialization.Serializable
 
 @Composable
 fun VecinalNavHost(
-    /* NavController externo (para pruebas o previews) */
     navController: NavHostController = rememberNavController(),
-
-    /* Layout modifier que llega desde el Scaffold */
-    modifier: Modifier = Modifier.fillMaxSize(),
 
     /* Preferencias actuales */
     isSenior: Boolean,
@@ -55,14 +50,13 @@ fun VecinalNavHost(
     onLoggedOut: () -> Unit,
 ) {
     NavHost(
-        navController = navController,
-        startDestination = when {
+        navController = navController, startDestination = when {
             user == null -> ScreenLogin
             isFirstTime -> ScreenOnboarding
             else -> ScreenDashboard
         },
 
-        modifier = modifier
+        modifier = Modifier.fillMaxSize()
     ) {
 
         composable<ScreenLogin> {

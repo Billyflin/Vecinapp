@@ -6,7 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -91,7 +90,6 @@ class MainActivity : ComponentActivity() {
                     Box(modifier = Modifier.padding(inner)) {
                         VecinalNavHost(
                             navController = navController,
-                            modifier = Modifier.fillMaxSize(),
                             isSenior = seniorMode,
                             darkMode = darkMode,
                             dynamicColors = dynamicColor,
