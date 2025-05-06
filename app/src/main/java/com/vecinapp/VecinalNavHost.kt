@@ -17,12 +17,14 @@ import com.vecinapp.ui.screen.AnunciosScreen
 import com.vecinapp.ui.screen.DashboardScreen
 import com.vecinapp.ui.screen.EventDetailScreen
 import com.vecinapp.ui.screen.EventosListScreen
+import com.vecinapp.ui.screen.LoginScreen
 import com.vecinapp.ui.screen.OnboardingModeScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.PanelDirectivoScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
 import com.vecinapp.ui.screen.RegisterScreenMobile
 import com.vecinapp.ui.screen.SettingsScreen
+
 import com.vecinapp.ui.screen.SugerenciasListScreen
 import com.vecinapp.ui.screen.TablonListScreen
 import kotlinx.serialization.Serializable
@@ -47,14 +49,30 @@ fun VecinalNavHost(
     onDynamicChange: suspend (Boolean) -> Unit,
     onFirstTimeChange: suspend (Boolean) -> Unit,
 
+    user: Any?,
+
     /* Sesión */
     onLoggedOut: () -> Unit,
 ) {
     NavHost(
         navController = navController,
-        startDestination = ScreenDashboard,
+        startDestination = when {
+            user == null -> ScreenLogin
+            isFirstTime -> ScreenOnboarding
+            else -> ScreenDashboard
+        },
+
         modifier = modifier
     ) {
+
+        composable<ScreenLogin> {
+            LoginScreen(onSignInSuccess = {
+                navController.navigate(ScreenDashboard) {
+                    popUpTo(ScreenLogin) { inclusive = true }
+                }
+            })
+        }
+
 
         composable<ScreenOnboarding> {
             OnboardingModeScreen(onFirstTimeChange = { first ->
@@ -165,6 +183,10 @@ fun VecinalNavHost(
 
 
 /* Rutas serializables */
+
+@Serializable
+object ScreenLogin
+
 @Serializable
 object ScreenOnboarding
 
