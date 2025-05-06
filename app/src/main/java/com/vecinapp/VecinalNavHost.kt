@@ -45,24 +45,27 @@ fun VecinalNavHost(
     onSeniorChange: suspend (Boolean) -> Unit,
     onDarkChange: suspend (Boolean) -> Unit,
     onDynamicChange: suspend (Boolean) -> Unit,
+    onFirstTimeChange: suspend (Boolean) -> Unit,
 
     /* Sesión */
     onLoggedOut: () -> Unit,
 ) {
     NavHost(
         navController = navController,
-        startDestination = if (isFirstTime) ScreenOnboarding else ScreenDashboard,
+        startDestination = ScreenDashboard,
         modifier = modifier
     ) {
 
-        /* Onboarding – elegir modo visual */
         composable<ScreenOnboarding> {
-            OnboardingModeScreen { senior ->
-                // guardamos la elección y continuamos
-                navController.navigate(ScreenDashboard) {
+            OnboardingModeScreen(onFirstTimeChange = { first ->
+                onFirstTimeChange(first)
+            }, onSeniorChange = { senior ->
+                onSeniorChange(senior)
+            }, onContinue = {
+                navController.navigate(ScreenRegisterPhone) {
                     popUpTo(ScreenOnboarding) { inclusive = true }
                 }
-            }
+            })
         }
 
         composable<ScreenRegisterPhone> {

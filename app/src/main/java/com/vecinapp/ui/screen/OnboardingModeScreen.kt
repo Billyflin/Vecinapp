@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -44,8 +45,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 
 @Composable
 fun ModeCard(
@@ -149,7 +150,12 @@ fun SeniorFeatureItem(icon: ImageVector, text: String) {
 }
 
 @Composable
-fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
+fun OnboardingModeScreen(
+    onFirstTimeChange: suspend (Boolean) -> Unit,
+    onSeniorChange: suspend (Boolean) -> Unit,
+    onContinue: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
     var isSenior by rememberSaveable { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -279,7 +285,15 @@ fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
 
         // Botón de continuar
         Button(
-            onClick = { onSelect(isSenior) },
+            onClick = {
+                scope.launch {
+                    // guardamos la elección en DataStore
+                    onSeniorChange(isSenior)
+                    onFirstTimeChange(false)
+                }
+                // navegamos al siguiente paso
+                onContinue()
+            },
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -307,10 +321,3 @@ fun OnboardingModeScreen(onSelect: (Boolean) -> Unit) {
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-private fun PreviewOnboardingMode() {
-    MaterialTheme {
-        OnboardingModeScreen { /* acción */ }
-    }
-}
