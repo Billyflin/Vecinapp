@@ -175,47 +175,78 @@ fun VecinalNavHost(
 
 /* Rutas serializables */
 
+//@Serializable
+//object ScreenLogin
+//
+//@Serializable
+//object ScreenOnboarding
+//
+//@Serializable
+//object ScreenRegisterPhone
+//
+//@Serializable
+//object ScreenProfileCompletion   // ← nueva ruta
+//
+//@Serializable
+//object ScreenDashboard {
+//    fun toRoute(): String {
+//        return ("com.vecinapp.ScreenDashboard")
+//
+//    }
+//}
+//
+//@Serializable
+//object ScreenAnuncios {
+//    fun toRoute(): String {
+//        return ("com.vecinapp.ScreenAnuncios")
+//    }
+//}
+//
+//@Serializable
+//object ScreenEventos
+//
 @Serializable
-object ScreenLogin
+data class ScreenEventoDetail(val eventId: String) : Screen {
+    override fun toRoute(): String =
+        "${this::class.qualifiedName}/$eventId"
+}
+//
+//@Serializable
+//object ScreenSugerencias
+//
+//@Serializable
+//object ScreenTablon
+//
+//@Serializable
+//object ScreenPanel
 
-@Serializable
-object ScreenOnboarding
 
-@Serializable
-object ScreenRegisterPhone
-
-@Serializable
-object ScreenProfileCompletion   // ← nueva ruta
-
-@Serializable
-object ScreenDashboard {
-    fun toRoute(): String {
-        return ("com.vecinapp.ScreenDashboard")
-
-    }
+interface Screen {
+    /**
+     * Por defecto usa el nombre cualificado de la clase
+     */
+    fun toRoute(): String = this::class.qualifiedName!!
 }
 
 @Serializable
-object ScreenAnuncios
-
+object ScreenLogin : Screen
 @Serializable
-object ScreenEventos
-
+object ScreenOnboarding : Screen
 @Serializable
-data class ScreenEventoDetail(val eventId: String)
-
+object ScreenRegisterPhone : Screen
 @Serializable
-object ScreenSugerencias
-
+object ScreenProfileCompletion : Screen
 @Serializable
-object ScreenTablon
-
+object ScreenDashboard : Screen
 @Serializable
-object ScreenPanel
-
+object ScreenAnuncios : Screen
 @Serializable
-object ScreenSettings {
-    fun toRoute(): String {
-        return ("com.vecinapp.ScreenSettings")
-    }
-}
+object ScreenEventos : Screen
+@Serializable
+object ScreenSugerencias : Screen
+@Serializable
+object ScreenTablon : Screen
+@Serializable
+object ScreenPanel : Screen
+@Serializable
+object ScreenSettings : Screen

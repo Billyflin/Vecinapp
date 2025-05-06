@@ -1,7 +1,16 @@
 package com.vecinapp.presentation
 
-import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,27 +26,40 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Diversity3
-import androidx.compose.material.icons.filled.EditLocationAlt
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.rounded.Map
+import androidx.compose.material.icons.rounded.Forum
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -46,145 +68,343 @@ import com.vecinapp.ScreenAnuncios
 import com.vecinapp.ScreenEventos
 import com.vecinapp.ScreenSettings
 import com.vecinapp.ScreenSugerencias
-
+import kotlinx.coroutines.delay
 
 @Composable
 fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
+    val haptic = LocalHapticFeedback.current
+
+    // Get current route
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // Animation for the FAB
+    var showFab by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(100)
+        showFab = true
+    }
+
+    val fabScale by animateFloatAsState(
+        targetValue = if (showFab) 1f else 0f,
+        animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing),
+        label = "fabScale"
+    )
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(146.dp)
-            .padding(bottom = 70.dp)
-            .background(Color.Transparent), contentAlignment = Alignment.BottomCenter
-
+            .height(85.dp)
+            .padding(bottom = 8.dp),
+        contentAlignment = Alignment.BottomCenter
     ) {
+        // Main navigation bar
         Surface(
-            shape = RoundedCornerShape(percent = 20),
+            shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 8.dp,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(176.dp)
-                .padding(horizontal = 16.dp)
+                .height(70.dp)
+                .padding(horizontal = 12.dp)
+                .shadow(
+                    elevation = 8.dp,
+                    shape = RoundedCornerShape(24.dp),
+                    spotColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+                )
         ) {
             Row(
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 8.dp)
             ) {
-                // Botón 1
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = {
+                // Botón 1 - Chat Grupal
+                NavBarItem(
+                    icon = Icons.Rounded.Forum,
+                    title = "Chat Grupal",
+                    isSelected = currentRoute == ScreenAnuncios.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         navController.navigate(ScreenAnuncios) {
                             popUpTo(navController.graph.startDestinationId)
                             launchSingleTop = true
                         }
-                    }) {
-                        Icon(
-                            imageVector = Icons.Rounded.Map,
-                            contentDescription = "Inicio",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(30.dp)
-                        )
                     }
-                    Text("Sugerencias", style = MaterialTheme.typography.bodySmall)
-                }
+                )
 
-                // Botón 2
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = {
-                        navController.navigate(ScreenEventos) {
-                            popUpTo(navController.graph.startDestinationId)
-                            launchSingleTop = true
-                        }
-                    }) {
-                        Icon(
-                            Icons.Default.DateRange,
-                            contentDescription = "Historial",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
-                    Text("Eventos", style = MaterialTheme.typography.bodySmall)
-                }
-
-                Spacer(modifier = Modifier.width(30.dp))
-
-                // Botón 3
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = {
+                // Botón 2 - Sugerencias
+                NavBarItem(
+                    icon = Icons.Default.Lightbulb,
+                    title = "Sugerencias",
+                    isSelected = currentRoute == ScreenSugerencias.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         navController.navigate(ScreenSugerencias) {
                             popUpTo(navController.graph.startDestinationId)
                             launchSingleTop = true
                         }
-                    }) {
-                        Icon(
-                            Icons.Default.EditLocationAlt,
-                            contentDescription = "Inicio",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(30.dp)
-                        )
                     }
-                    Text("Recompensas", style = MaterialTheme.typography.bodySmall)
-                }
+                )
 
-                // Botón 4
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    IconButton(onClick = {
-                        navController.navigate(ScreenSettings) {
+                // Espacio para el FAB
+                Spacer(modifier = Modifier.width(64.dp))
+
+                // Botón 3 - Eventos
+                NavBarItem(
+                    icon = Icons.Default.Event,
+                    title = "Eventos",
+                    isSelected = currentRoute == ScreenEventos.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigate(ScreenEventos) {
                             popUpTo(navController.graph.startDestinationId)
                             launchSingleTop = true
                         }
-                    }) {
-                        Log.d("user", user.toString())
-                        if (user?.photoUrl != null) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(user.photoUrl).crossfade(true).build(),
-                                contentScale = ContentScale.Crop,
-                                contentDescription = "Foto de perfil",
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(CircleShape)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = "Perfil",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(30.dp)
-                            )
-                        }
                     }
-                    Text("Perfil", style = MaterialTheme.typography.bodySmall)
+                )
+
+                // Botón 4 - Cuenta (con foto de perfil si está disponible)
+                if (user?.photoUrl != null) {
+                    ProfileNavItem(
+                        photoUrl = user.photoUrl.toString(),
+                        title = "Cuenta",
+                        isSelected = currentRoute == ScreenSettings.toRoute(),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            navController.navigate(ScreenSettings) {
+                                popUpTo(navController.graph.startDestinationId)
+                                launchSingleTop = true
+                            }
+                        }
+                    )
+                } else {
+                    NavBarItem(
+                        icon = Icons.Default.Person,
+                        title = "Cuenta",
+                        isSelected = currentRoute == ScreenSettings.toRoute(),
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            navController.navigate(ScreenSettings) {
+                                popUpTo(navController.graph.startDestinationId)
+                                launchSingleTop = true
+                            }
+                        }
+                    )
                 }
             }
         }
 
-        FloatingActionButton(
-            onClick = {
-                navController.navigate(ScreenEventos)
-            },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+        // Community FAB
+        AnimatedVisibility(
+            visible = showFab,
+            enter = fadeIn(animationSpec = tween(500)) +
+                    slideInVertically(
+                        animationSpec = tween(500),
+                        initialOffsetY = { it }
+                    ),
+            exit = fadeOut(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (-18).dp)
+                .offset(y = (-20).dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Diversity3,
-                contentDescription = "Comunidad",
-                tint = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.size(36.dp)
-            )
+            FloatingActionButton(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    navController.navigate(ScreenEventos) {
+                        popUpTo(navController.graph.startDestinationId)
+                        launchSingleTop = true
+                    }
+                },
+                shape = CircleShape,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .size(56.dp)
+                    .scale(fabScale)
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.Diversity3,
+                    contentDescription = "Comunidad",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
     }
 }
 
+@Composable
+fun NavBarItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    // Animations for selection
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.1f else 1.0f,
+        animationSpec = tween(durationMillis = 300),
+        label = "scale"
+    )
+
+    val indicatorHeight by animateDpAsState(
+        targetValue = if (isSelected) 3.dp else 0.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "indicatorHeight"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isSelected)
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else
+                        Color.Transparent
+                )
+                .padding(8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = if (isSelected)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 11.sp
+            ),
+            color = if (isSelected)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+
+        // Selection indicator
+        Box(
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .width(20.dp)
+                .height(indicatorHeight)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+    }
+}
+
+@Composable
+fun ProfileNavItem(
+    photoUrl: String,
+    title: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    // Animations for selection
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.1f else 1.0f,
+        animationSpec = tween(durationMillis = 300),
+        label = "scale"
+    )
+
+    val indicatorHeight by animateDpAsState(
+        targetValue = if (isSelected) 3.dp else 0.dp,
+        animationSpec = tween(durationMillis = 300),
+        label = "indicatorHeight"
+    )
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(
+                    if (isSelected)
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                    else
+                        Color.Transparent
+                )
+                .padding(4.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(photoUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Foto de perfil",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .border(
+                        width = if (isSelected) 2.dp else 1.dp,
+                        color = if (isSelected)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.outline,
+                        shape = CircleShape
+                    )
+            )
+        }
+
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 11.sp
+            ),
+            color = if (isSelected)
+                MaterialTheme.colorScheme.primary
+            else
+                MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+
+        // Selection indicator
+        Box(
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .width(20.dp)
+                .height(indicatorHeight)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.primary)
+        )
+    }
+}
 
 @Preview
 @Composable
 fun NavBarPreview() {
-    BottomNavigationBar(rememberNavController(), null)
+    MaterialTheme {
+        BottomNavigationBar(rememberNavController(), null)
+    }
 }
