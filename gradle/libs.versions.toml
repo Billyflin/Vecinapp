@@ -28,7 +28,8 @@ playServicesAuth        = "20.7.0"   # ← estable
 credentialsPlayServicesAuth = "1.2.2"
 firebaseCrashlyticsBuildtools = "3.0.3"
 firebaseStorageKtx = "21.0.1"
-playServicesLocation = "21.3.0" # ← compatible con 20.7
+playServicesLocation = "21.3.0"
+junitJupiter = "5.8.1" # ← compatible con 20.7
 
 
 [libraries]
@@ -72,6 +73,7 @@ onetapcompose = { module = "com.github.stevdza-san:OneTapCompose", version.ref =
 firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+junit-jupiter = { group = "org.junit.jupiter", name = "junit-jupiter", version.ref = "junitJupiter" }
 
 
 

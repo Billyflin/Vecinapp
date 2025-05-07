@@ -65,6 +65,7 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.auth.FirebaseUser
 import com.vecinapp.ScreenAnuncios
+import com.vecinapp.ScreenDashboard
 import com.vecinapp.ScreenEventos
 import com.vecinapp.ScreenSettings
 import com.vecinapp.ScreenSugerencias
@@ -197,7 +198,7 @@ fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
             FloatingActionButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    navController.navigate(ScreenEventos) {
+                    navController.navigate(ScreenDashboard) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

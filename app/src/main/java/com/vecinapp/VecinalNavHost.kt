@@ -1,7 +1,9 @@
 package com.vecinapp
 
+import android.util.Log
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,10 +18,13 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
+import com.vecinapp.community.CommunityManager
 import com.vecinapp.ui.screen.AnunciosScreen
+import com.vecinapp.ui.screen.CreateComunityScreen
 import com.vecinapp.ui.screen.DashboardScreen
 import com.vecinapp.ui.screen.EventDetailScreen
 import com.vecinapp.ui.screen.EventosListScreen
+import com.vecinapp.ui.screen.JoinComunityScreen
 import com.vecinapp.ui.screen.LoginScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.PanelDirectivoScreen
@@ -28,6 +33,8 @@ import com.vecinapp.ui.screen.RegisterScreenMobile
 import com.vecinapp.ui.screen.SettingsScreen
 import com.vecinapp.ui.screen.SugerenciasListScreen
 import com.vecinapp.ui.screen.TablonListScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -63,6 +70,19 @@ fun VecinalNavHost(
     val showNavBar = remember(navController.currentDestination?.route) {
         navController.currentDestination?.route != ScreenProfileCompletion.toRoute()
     }
+
+    val communityManager = remember { CommunityManager(context) }
+
+
+    // Obtener estados del CommunityManager
+    val userCommunities by communityManager.userCommunities.collectAsState()
+    val isLoadingCommunities by communityManager.isLoadingCommunities.collectAsState()
+    val isCreatingCommunity by communityManager.isCreatingCommunity.collectAsState()
+    val communityCreationError by communityManager.communityCreationError.collectAsState()
+    val isJoiningCommunity by communityManager.isJoiningCommunity.collectAsState()
+    val communityJoinError by communityManager.communityJoinError.collectAsState()
+
+
 
     NavHost(
         navController = navController, startDestination = when {
@@ -160,9 +180,58 @@ fun VecinalNavHost(
         composable<ScreenDashboard> {
             DashboardScreen(
                 isSenior = isSenior,
-                onNavigate = { dest -> navController.navigate(dest) }
+                onNavigate = { dest -> navController.navigate(dest) },
+                onJoinCommunity = { navController.navigate(ScreenJoinComunity) },
+                onCreateCommunity = { navController.navigate(ScreenCreateComunity) },
             )
         }
+
+        composable<ScreenCreateComunity> {
+            CreateComunityScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onCommunityCreated = { community ->
+                    Log.d("CommunityManager", "Community created: $community")
+                    // Usar el CommunityManager para crear la comunidad
+                    CoroutineScope(Dispatchers.IO).launch {
+                        communityManager.createCommunity(community).onSuccess {
+                            // Navegar de vuelta al dashboard
+                            navController.navigate(ScreenDashboard.toString()) {
+                                popUpTo(ScreenCreateComunity.toString()) { inclusive = true }
+                            }
+                        }.onFailure { error ->
+                            Log.e("CommunityManager", "Error creating community: $error")
+                        }
+                    }
+                },
+                isLoading = isCreatingCommunity,
+                error = communityCreationError
+            )
+        }
+
+
+        composable<ScreenJoinComunity> {
+            JoinComunityScreen(
+                onNavigateBack = { navController.popBackStack() },
+                onJoinCommunity = { community ->
+                    // Usar el CommunityManager para unirse a la comunidad
+                    CoroutineScope(Dispatchers.IO).launch {
+
+                        communityManager.joinCommunity(community).onSuccess {
+                            // Navegar de vuelta al dashboard
+                            navController.navigate(ScreenDashboard.toString()) {
+                                popUpTo(ScreenJoinComunity.toString()) { inclusive = true }
+                            }
+                        }
+                    }
+                },
+                onScanQrCode = {
+                    communityManager.startQrCodeScanner()
+                },
+                isLoading = isJoiningCommunity,
+                error = communityJoinError
+            )
+        }
+
 
         /* Anuncios */
         composable<ScreenAnuncios> {
@@ -221,6 +290,15 @@ interface Screen {
      */
     fun toRoute(): String = this::class.qualifiedName!!
 }
+
+@Serializable
+object ScreenCreateComunity : Screen
+
+@Serializable
+object ScreenJoinComunity : Screen
+
+@Serializable
+object ScreenCreateEvent : Screen
 
 @Serializable
 object ScreenLogin : Screen

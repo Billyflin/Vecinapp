@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Button
@@ -41,10 +42,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.firebase.FirebaseException
@@ -54,6 +54,9 @@ import com.vecinapp.auth.AuthManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * Pantalla de verificación de código OTP para autenticación por teléfono
+ */
 @Composable
 fun OtpVerificationScreen(
     authManager: AuthManager,
@@ -65,11 +68,13 @@ fun OtpVerificationScreen(
     onCancel: () -> Unit
 ) {
     var otpValue by remember {
-        mutableStateOf(TextFieldValue(text = "", selection = TextRange(0)))
+        mutableStateOf("")
     }
     var isLoading by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+
 
     // Auto-focus the OTP field
     LaunchedEffect(Unit) {
@@ -99,7 +104,7 @@ fun OtpVerificationScreen(
             ) {
                 IconButton(onClick = onCancel) {
                     Icon(
-                        Icons.AutoMirrored.Filled.ArrowBack,
+                        Icons.Default.ArrowBack,
                         contentDescription = "Volver",
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -137,7 +142,7 @@ fun OtpVerificationScreen(
             BasicTextField(
                 value = otpValue,
                 onValueChange = {
-                    if (it.text.length <= 6 && it.text.all { char -> char.isDigit() }) {
+                    if (it.length <= 6 && it.all { char -> char.isDigit() }) {
                         otpValue = it
                     }
                 },
@@ -146,7 +151,7 @@ fun OtpVerificationScreen(
                 decorationBox = { innerTextField ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         repeat(6) { index ->
-                            val char = otpValue.text.getOrNull(index)
+                            val char = otpValue.getOrNull(index)
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
@@ -173,7 +178,10 @@ fun OtpVerificationScreen(
                             }
                         }
                     }
-                    innerTextField()
+                    // Hacemos invisible el campo de texto real pero permitimos la entrada
+                    Box(modifier = Modifier.size(0.dp)) {
+                        innerTextField()
+                    }
                 }
             )
 
@@ -187,10 +195,11 @@ fun OtpVerificationScreen(
             } else {
                 Button(
                     onClick = {
-                        if (otpValue.text.length == 6) {
+                        if (otpValue.length == 6) {
                             isLoading = true
+                            keyboardController?.hide()  
                             scope.launch {
-                                authManager.verifyPhoneNumberWithCode(verificationId, otpValue.text)
+                                authManager.verifyPhoneNumberWithCode(verificationId, otpValue)
                                     .onSuccess { credential ->
                                         authManager.signInWithCredential(credential)
                                             .onSuccess {
@@ -213,7 +222,7 @@ fun OtpVerificationScreen(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
-                    enabled = otpValue.text.length == 6
+                    enabled = otpValue.length == 6
                 ) {
                     Text(
                         text = "Verificar",
@@ -253,6 +262,7 @@ fun RegisterScreenMobile(
     var phoneNumber by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val activity = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     Card(
         modifier = Modifier
@@ -330,6 +340,8 @@ fun RegisterScreenMobile(
                     onClick = {
                         if (phoneNumber.isNotBlank()) {
                             isLoading = true
+
+                            keyboardController?.hide()
 
                             val callbacks =
                                 object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {

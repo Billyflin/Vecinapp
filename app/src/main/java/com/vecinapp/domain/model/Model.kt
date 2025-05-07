@@ -200,6 +200,7 @@ data class Community(
     val id: String = "",
     val name: String = "",
     val description: String? = null,
+    val creatorId: String = "",
     @Contextual @ServerTimestamp
     val createdAt: Timestamp? = null,
     @Contextual @ServerTimestamp
@@ -209,5 +210,8 @@ data class Community(
     val directive: List<DirectiveMember> = emptyList(),
     val announcements: List<Announcement> = emptyList(),
     val events: List<Event> = emptyList(),
-    val proposals: List<Proposal> = emptyList()
+    val proposals: List<Proposal> = emptyList(),
+    val address: String,
+    val isPublic: Boolean,
+    val imageUrl: String?
 )
