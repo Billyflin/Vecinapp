@@ -1,42 +1,30 @@
 package com.vecinapp.ui.screen
 
-import android.app.Activity
-import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Message
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.outlined.Error
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,495 +34,356 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.PhoneAuthCredential
-import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
-import com.google.firebase.auth.ktx.auth
-import com.google.firebase.ktx.Firebase
+import com.vecinapp.auth.AuthManager
 import kotlinx.coroutines.delay
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.launch
 
-/**
- * Paso 1: pedir número, enviar SMS.
- */
 @Composable
-fun RegisterScreenMobile(
-    forceResendingToken: PhoneAuthProvider.ForceResendingToken? = null,
-    onVerificationSent: (verificationId: String, token: PhoneAuthProvider.ForceResendingToken) -> Unit
+fun OtpVerificationScreen(
+    authManager: AuthManager,
+    verificationId: String,
+    forceResendingToken: PhoneAuthProvider.ForceResendingToken?,
+    onVerified: () -> Unit,
+    onResend: () -> Unit,
+    onError: (String) -> Unit,
+    onCancel: () -> Unit
 ) {
-    var phone by remember { mutableStateOf("") }
-    var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val focusRequester = remember { FocusRequester() }
-    val context = LocalContext.current
-    val activity = context as Activity
-
-    val infiniteTransition = rememberInfiniteTransition(label = "loading")
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "rotation"
-    )
-
-    val callbacks = remember {
-        object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-            override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                isLoading = false
-                Firebase.auth.signInWithCredential(credential)
-                    .addOnFailureListener {
-                        errorMessage = "Auto-login falló: ${it.localizedMessage}"
-                    }
-            }
-
-            override fun onVerificationFailed(e: FirebaseException) {
-                isLoading = false
-                Log.e("PhoneAuth", "Error verificación: ${e.message}")
-                errorMessage = "Error: ${e.localizedMessage}"
-            }
-
-            override fun onCodeSent(
-                verificationId: String,
-                token: PhoneAuthProvider.ForceResendingToken
-            ) {
-                super.onCodeSent(verificationId, token)
-                isLoading = false
-                onVerificationSent(verificationId, token)
-            }
-        }
+    var otpValue by remember {
+        mutableStateOf(TextFieldValue(text = "", selection = TextRange(0)))
     }
+    var isLoading by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val scope = rememberCoroutineScope()
 
+    // Auto-focus the OTP field
     LaunchedEffect(Unit) {
-        delay(300)
+        delay(300) // Small delay to ensure the UI is ready
         focusRequester.requestFocus()
     }
 
-    Box(
+    Card(
         modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
+            .fillMaxWidth(0.9f)
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 4.dp
-            ),
-            shape = RoundedCornerShape(24.dp)
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header
-                Icon(
-                    imageVector = Icons.Filled.PhoneAndroid,
-                    contentDescription = null,
-                    modifier = Modifier.size(64.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Verificación de Teléfono",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-
-                Text(
-                    text = "Te enviaremos un código SMS",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                HorizontalDivider(
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Phone input
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = {
-                        phone = it
-                        errorMessage = null
-                    },
-                    label = { Text("Número de teléfono") },
-                    placeholder = { Text("+569 XXXXXXXX") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    isError = errorMessage != null,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Phone,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                )
-
-                AnimatedVisibility(
-                    visible = errorMessage != null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Error,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = errorMessage ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
+                IconButton(onClick = onCancel) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Verificación de código",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
-                // Send button
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Icon(
+                Icons.Default.LockOpen,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(48.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                "Ingresa el código de verificación que enviamos a tu teléfono",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // OTP Input
+            BasicTextField(
+                value = otpValue,
+                onValueChange = {
+                    if (it.text.length <= 6 && it.text.all { char -> char.isDigit() }) {
+                        otpValue = it
+                    }
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                modifier = Modifier.focusRequester(focusRequester),
+                decorationBox = { innerTextField ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        repeat(6) { index ->
+                            val char = otpValue.text.getOrNull(index)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (char != null)
+                                            MaterialTheme.colorScheme.primary
+                                        else
+                                            MaterialTheme.colorScheme.outline,
+                                        shape = RoundedCornerShape(8.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = char?.toString() ?: "",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    innerTextField()
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(8.dp)
+                )
+            } else {
                 Button(
                     onClick = {
-                        if (phone.isBlank()) {
-                            errorMessage = "Por favor ingresa un número de teléfono"
-                            return@Button
+                        if (otpValue.text.length == 6) {
+                            isLoading = true
+                            scope.launch {
+                                authManager.verifyPhoneNumberWithCode(verificationId, otpValue.text)
+                                    .onSuccess { credential ->
+                                        authManager.signInWithCredential(credential)
+                                            .onSuccess {
+                                                isLoading = false
+                                                onVerified()
+                                            }
+                                            .onFailure { e ->
+                                                isLoading = false
+                                                onError("Error de verificación: ${e.message}")
+                                            }
+                                    }
+                                    .onFailure { e ->
+                                        isLoading = false
+                                        onError("Código inválido: ${e.message}")
+                                    }
+                            }
+                        } else {
+                            onError("Por favor ingresa el código de 6 dígitos completo")
                         }
-
-                        isLoading = true
-                        errorMessage = null
-
-                        val builder = PhoneAuthOptions.newBuilder(Firebase.auth)
-                            .setPhoneNumber(phone.trim())
-                            .setTimeout(60, TimeUnit.SECONDS)
-                            .setActivity(activity)
-                            .setCallbacks(callbacks)
-
-                        forceResendingToken?.let { builder.setForceResendingToken(it) }
-                        PhoneAuthProvider.verifyPhoneNumber(builder.build())
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = otpValue.text.length == 6
                 ) {
-                    if (isLoading) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(24.dp)
-                                .rotate(rotation)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Enviando...")
-                    } else {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Send,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Enviar código")
-                    }
+                    Text(
+                        text = "Verificar",
+                        fontWeight = FontWeight.Medium
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Al continuar, aceptas recibir un SMS con el código de verificación",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        "¿No recibiste el código?",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    TextButton(onClick = onResend) {
+                        Text("Reenviar")
+                    }
+                }
             }
         }
     }
 }
 
-/**
- * Paso 2: pedir OTP y verificar.
- */
 @Composable
-fun OtpVerificationScreen(
-    verificationId: String,
+fun RegisterScreenMobile(
+    authManager: AuthManager,
     forceResendingToken: PhoneAuthProvider.ForceResendingToken?,
-    onVerified: () -> Unit,
-    onResend: () -> Unit
+    onVerificationSent: (String, PhoneAuthProvider.ForceResendingToken) -> Unit,
+    onError: (String) -> Unit,
+    onCancel: () -> Unit
 ) {
-    var code by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
-    val focusRequester = remember { FocusRequester() }
-    val context = LocalContext.current
+    val activity = LocalContext.current
 
-    val infiniteTransition = rememberInfiniteTransition(label = "loading")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
-
-    LaunchedEffect(Unit) {
-        delay(300)
-        focusRequester.requestFocus()
-    }
-
-    Box(
+    Card(
         modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.3f),
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            ),
-        contentAlignment = Alignment.Center
+            .fillMaxWidth(0.9f)
+            .padding(16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 4.dp
+        )
     ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .padding(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(
-                defaultElevation = 4.dp
-            ),
-            shape = RoundedCornerShape(24.dp)
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(
-                                    MaterialTheme.colorScheme.secondary,
-                                    MaterialTheme.colorScheme.secondaryContainer
-                                )
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
+                IconButton(onClick = onCancel) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Message,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.onSecondary
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Volver",
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Text(
-                    text = "Verificación de Código",
-                    style = MaterialTheme.typography.headlineSmall,
+                    "Ingresar con teléfono",
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
+                    color = MaterialTheme.colorScheme.onSurface
                 )
+            }
 
-                Text(
-                    text = "Ingresa el código que recibiste por SMS",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    textAlign = TextAlign.Center
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                "Ingresa tu número de teléfono para recibir un código de verificación",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { phoneNumber = it },
+                label = { Text("Número de teléfono") },
+                placeholder = { Text("+56 9 1234 5678") },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Call,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (isLoading) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(8.dp)
                 )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                HorizontalDivider(
-                    modifier = Modifier
-                        .fillMaxWidth(0.7f)
-                        .padding(vertical = 8.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // OTP input
-                OutlinedTextField(
-                    value = code,
-                    onValueChange = {
-                        code = it
-                        errorMessage = null
-                    },
-                    label = { Text("Código de verificación") },
-                    placeholder = { Text("Ingresa el código de 6 dígitos") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .focusRequester(focusRequester),
-                    isError = errorMessage != null,
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Message,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
-                    }
-                )
-
-                AnimatedVisibility(
-                    visible = errorMessage != null,
-                    enter = fadeIn(),
-                    exit = fadeOut()
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Error,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = errorMessage ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Verify button
+            } else {
                 Button(
                     onClick = {
-                        if (code.isBlank()) {
-                            errorMessage = "Por favor ingresa el código"
-                            return@Button
+                        if (phoneNumber.isNotBlank()) {
+                            isLoading = true
+
+                            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                                    // This will not be called for most phones since we're using manual verification
+                                    isLoading = false
+                                }
+
+                                override fun onVerificationFailed(e: FirebaseException) {
+                                    isLoading = false
+                                    onError("Error: ${e.message}")
+                                    e.printStackTrace()
+                                }
+
+                                override fun onCodeSent(
+                                    verificationId: String,
+                                    token: PhoneAuthProvider.ForceResendingToken
+                                ) {
+                                    isLoading = false
+                                    onVerificationSent(verificationId, token)
+                                }
+                            }
+
+                            if (forceResendingToken != null) {
+                                authManager.resendVerificationCode(
+                                    phoneNumber = phoneNumber,
+                                    token = forceResendingToken,
+                                    activity = activity,
+                                    callbacks = callbacks
+                                )
+                            } else {
+                                authManager.startPhoneVerification(
+                                    phoneNumber = phoneNumber,
+                                    activity = activity,
+                                    callbacks = callbacks
+                                )
+                            }
+                        } else {
+                            onError("Por favor ingresa un número de teléfono válido")
                         }
-
-                        isLoading = true
-                        errorMessage = null
-
-                        val credential = PhoneAuthProvider.getCredential(verificationId, code.trim())
-                        Firebase.auth.signInWithCredential(credential)
-                            .addOnSuccessListener {
-                                isLoading = false
-                                onVerified()
-                            }
-                            .addOnFailureListener { e ->
-                                isLoading = false
-                                Log.e("PhoneAuth", "OTP incorrecto: ${e.message}")
-                                errorMessage = "Código inválido. Inténtalo de nuevo."
-                            }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = !isLoading,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.secondary
-                    )
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    if (isLoading) {
-                        Text("Verificando...")
-                    } else {
-                        Text("Verificar código")
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Resend button
-                TextButton(
-                    onClick = onResend,
-                    enabled = !isLoading
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        text = if (forceResendingToken != null) "Reenviar código" else "Enviar código",
+                        fontWeight = FontWeight.Medium
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reenviar código")
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Text(
-                    text = "Si no recibiste el código, verifica tu número o solicita un reenvío",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center
-                )
+                TextButton(onClick = onCancel) {
+                    Text("Cancelar")
+                }
             }
         }
     }

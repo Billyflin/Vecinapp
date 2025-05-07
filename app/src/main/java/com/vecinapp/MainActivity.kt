@@ -26,8 +26,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.ktx.auth
 import com.google.firebase.ktx.Firebase
+import com.vecinapp.auth.AuthManager
 import com.vecinapp.presentation.BottomNavigationBar
 import com.vecinapp.ui.theme.VecinappTheme
 import kotlinx.coroutines.flow.collectLatest
@@ -35,15 +37,18 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         val prefs = PreferencesManager(applicationContext)
         val initial = runBlocking { prefs.preferencesFlow.first() }
+        val authManager = AuthManager(applicationContext)
+
 
         setContent {
             val navController = rememberNavController()
@@ -52,7 +57,7 @@ class MainActivity : ComponentActivity() {
             var darkMode by remember { mutableStateOf(initial.darkMode) }
             var seniorMode by remember { mutableStateOf(initial.isSenior) }
             var isFirstTime by remember { mutableStateOf(initial.isFirstTime) }
-            var user by remember { mutableStateOf(Firebase.auth.currentUser) }
+            var user by remember { mutableStateOf<FirebaseUser?>(null) }
 
             LaunchedEffect(Unit) {
                 prefs.preferencesFlow.collectLatest { p ->
@@ -60,6 +65,11 @@ class MainActivity : ComponentActivity() {
                     dynamicColor = p.dynamicColor
                     seniorMode = p.isSenior
                     isFirstTime = p.isFirstTime
+                }
+            }
+            LaunchedEffect(Unit) {
+                authManager.currentUser.collect { currentUser ->
+                    user = currentUser
                 }
             }
 

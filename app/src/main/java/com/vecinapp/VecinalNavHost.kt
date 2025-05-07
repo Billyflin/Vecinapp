@@ -5,14 +5,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.google.firebase.auth.PhoneAuthProvider
+import com.vecinapp.auth.AuthManager
 import com.vecinapp.ui.screen.AnunciosScreen
 import com.vecinapp.ui.screen.DashboardScreen
 import com.vecinapp.ui.screen.EventDetailScreen
@@ -26,6 +29,7 @@ import com.vecinapp.ui.screen.RegisterScreenMobile
 import com.vecinapp.ui.screen.SettingsScreen
 import com.vecinapp.ui.screen.SugerenciasListScreen
 import com.vecinapp.ui.screen.TablonListScreen
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Composable
@@ -49,6 +53,10 @@ fun VecinalNavHost(
     /* Sesión */
     onLoggedOut: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val authManager = remember { AuthManager(context) }
+    val scope = rememberCoroutineScope()
+
     NavHost(
         navController = navController, startDestination = when {
             user == null -> ScreenLogin
@@ -67,33 +75,45 @@ fun VecinalNavHost(
             })
         }
 
-
         composable<ScreenOnboarding> {
-            OnboardingModeScreen(onFirstTimeChange = { first ->
-                onFirstTimeChange(first)
-            }, onSeniorChange = { senior ->
-                onSeniorChange(senior)
-            }, onContinue = {
-                navController.navigate(ScreenRegisterPhone)
-            })
+            OnboardingModeScreen(
+                onFirstTimeChange = { first ->
+                    scope.launch { onFirstTimeChange(first) }
+                },
+                onSeniorChange = { senior ->
+                    scope.launch { onSeniorChange(senior) }
+                },
+                onContinue = {
+                    navController.navigate(ScreenRegisterPhone)
+                }
+            )
         }
 
         composable<ScreenRegisterPhone> {
             var verificationId by remember { mutableStateOf<String?>(null) }
             var resendToken by remember {
-                mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(
-                    null
-                )
+                mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null)
             }
+            var errorMessage by remember { mutableStateOf<String?>(null) }
 
             if (verificationId == null) {
                 RegisterScreenMobile(
-                    forceResendingToken = null, onVerificationSent = { id, token ->
+                    authManager = authManager,
+                    forceResendingToken = resendToken,
+                    onVerificationSent = { id, token ->
                         verificationId = id
                         resendToken = token
-                    })
+                    },
+                    onError = { error ->
+                        errorMessage = error
+                    },
+                    onCancel = {
+                        navController.popBackStack()
+                    }
+                )
             } else {
                 OtpVerificationScreen(
+                    authManager = authManager,
                     verificationId = verificationId!!,
                     forceResendingToken = resendToken,
                     onVerified = {
@@ -103,26 +123,36 @@ fun VecinalNavHost(
                     },
                     onResend = {
                         verificationId = null
-                    })
+                    },
+                    onError = { error ->
+                        errorMessage = error
+                    },
+                    onCancel = {
+                        navController.popBackStack()
+                    }
+                )
             }
         }
-
 
         /* Completar datos de perfil tras OTP */
         composable<ScreenProfileCompletion> {
             ProfileCompletionScreen(
+                authManager = authManager,
                 onComplete = {
                     // una vez completado el perfil, vamos al dashboard
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenRegisterPhone) { inclusive = true }
                     }
-                })
+                }
+            )
         }
 
         /* Dashboard (normal o senior) */
         composable<ScreenDashboard> {
             DashboardScreen(
-                isSenior = isSenior, onNavigate = { dest -> navController.navigate(dest) })
+                isSenior = isSenior,
+                onNavigate = { dest -> navController.navigate(dest) }
+            )
         }
 
         /* Anuncios */
@@ -136,6 +166,7 @@ fun VecinalNavHost(
                 navController.navigate(ScreenEventoDetail(eventId = it.toString()))
             }
         }
+
         composable<ScreenEventoDetail> { backEntry ->
             val args = backEntry.toRoute<ScreenEventoDetail>()
             EventDetailScreen(
@@ -147,7 +178,8 @@ fun VecinalNavHost(
                 lat = -33.45,
                 lon = -70.66,
                 isSenior = isSenior,
-                onBack = { navController.popBackStack() })
+                onBack = { navController.popBackStack() }
+            )
         }
 
         /* Sugerencias, Tablón y Panel Directivo */
@@ -171,55 +203,6 @@ fun VecinalNavHost(
         }
     }
 }
-
-
-/* Rutas serializables */
-
-//@Serializable
-//object ScreenLogin
-//
-//@Serializable
-//object ScreenOnboarding
-//
-//@Serializable
-//object ScreenRegisterPhone
-//
-//@Serializable
-//object ScreenProfileCompletion   // ← nueva ruta
-//
-//@Serializable
-//object ScreenDashboard {
-//    fun toRoute(): String {
-//        return ("com.vecinapp.ScreenDashboard")
-//
-//    }
-//}
-//
-//@Serializable
-//object ScreenAnuncios {
-//    fun toRoute(): String {
-//        return ("com.vecinapp.ScreenAnuncios")
-//    }
-//}
-//
-//@Serializable
-//object ScreenEventos
-//
-@Serializable
-data class ScreenEventoDetail(val eventId: String) : Screen {
-    override fun toRoute(): String =
-        "${this::class.qualifiedName}/$eventId"
-}
-//
-//@Serializable
-//object ScreenSugerencias
-//
-//@Serializable
-//object ScreenTablon
-//
-//@Serializable
-//object ScreenPanel
-
 
 interface Screen {
     /**
@@ -250,3 +233,9 @@ object ScreenTablon : Screen
 object ScreenPanel : Screen
 @Serializable
 object ScreenSettings : Screen
+
+@Serializable
+data class ScreenEventoDetail(val eventId: String) : Screen {
+    override fun toRoute(): String =
+        "${this::class.qualifiedName}/$eventId"
+}
