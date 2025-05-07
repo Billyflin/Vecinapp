@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,19 +48,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.google.firebase.FirebaseException
-import com.google.firebase.auth.PhoneAuthCredential
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.firebase.auth.PhoneAuthProvider
-import com.vecinapp.auth.AuthManager
+import com.vecinapp.ui.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * Pantalla de verificación de código OTP para autenticación por teléfono
  */
 @Composable
 fun OtpVerificationScreen(
-    authManager: AuthManager,
+    viewModel: AuthViewModel = hiltViewModel(),
     verificationId: String,
     forceResendingToken: PhoneAuthProvider.ForceResendingToken?,
     onVerified: () -> Unit,
@@ -67,14 +66,30 @@ fun OtpVerificationScreen(
     onError: (String) -> Unit,
     onCancel: () -> Unit
 ) {
-    var otpValue by remember {
-        mutableStateOf("")
-    }
+    var otpValue by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    // Observar el estado de autenticación
+    val authState by viewModel.authState.collectAsState()
+
+    // Efecto para manejar cambios en el estado de autenticación
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Loading -> isLoading = true
+            is AuthViewModel.AuthState.Success -> {
+                isLoading = false
+                onVerified()
+            }
+            is AuthViewModel.AuthState.Error -> {
+                isLoading = false
+                onError((authState as AuthViewModel.AuthState.Error).message)
+            }
+            else -> isLoading = false
+        }
+    }
 
     // Auto-focus the OTP field
     LaunchedEffect(Unit) {
@@ -196,26 +211,8 @@ fun OtpVerificationScreen(
                 Button(
                     onClick = {
                         if (otpValue.length == 6) {
-                            isLoading = true
-                            keyboardController?.hide()  
-                            scope.launch {
-                                authManager.verifyPhoneNumberWithCode(verificationId, otpValue)
-                                    .onSuccess { credential ->
-                                        authManager.signInWithCredential(credential)
-                                            .onSuccess {
-                                                isLoading = false
-                                                onVerified()
-                                            }
-                                            .onFailure { e ->
-                                                isLoading = false
-                                                onError("Error de verificación: ${e.message}")
-                                            }
-                                    }
-                                    .onFailure { e ->
-                                        isLoading = false
-                                        onError("Código inválido: ${e.message}")
-                                    }
-                            }
+                            keyboardController?.hide()
+                            viewModel.verifyPhoneNumberWithCode(verificationId, otpValue)
                         } else {
                             onError("Por favor ingresa el código de 6 dígitos completo")
                         }
@@ -250,10 +247,96 @@ fun OtpVerificationScreen(
         }
     }
 }
+@Composable
+fun RegisterPhoneScreen(
+    viewModel: AuthViewModel = hiltViewModel(),
+    onVerified: () -> Unit,
+    onCancel: () -> Unit
+) {
+    // Estados para manejar el flujo de verificación
+    var verificationId by remember { mutableStateOf<String?>(null) }
+    var resendToken by remember { mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // Observar el estado de verificación del teléfono
+    val phoneVerificationState by viewModel.phoneVerificationState.collectAsState()
+
+    // Efecto para manejar cambios en el estado de verificación
+    LaunchedEffect(phoneVerificationState) {
+        when (phoneVerificationState) {
+            is AuthViewModel.PhoneVerificationState.CodeSent -> {
+                val state = phoneVerificationState as AuthViewModel.PhoneVerificationState.CodeSent
+                verificationId = state.verificationId
+                resendToken = state.token
+            }
+            is AuthViewModel.PhoneVerificationState.Error -> {
+                errorMessage = (phoneVerificationState as AuthViewModel.PhoneVerificationState.Error).message
+            }
+            else -> {}
+        }
+    }
+
+    // Observar el estado de autenticación
+    val authState by viewModel.authState.collectAsState()
+
+    // Efecto para manejar cambios en el estado de autenticación
+    LaunchedEffect(authState) {
+        when (authState) {
+            is AuthViewModel.AuthState.Success -> {
+                onVerified()
+            }
+            is AuthViewModel.AuthState.Error -> {
+                errorMessage = (authState as AuthViewModel.AuthState.Error).message
+            }
+            else -> {}
+        }
+    }
+
+    // Mostrar la pantalla correspondiente según el estado
+    if (verificationId == null) {
+        RegisterScreenMobile(
+            viewModel = viewModel,
+            forceResendingToken = resendToken,
+            onVerificationSent = { id, token ->
+                verificationId = id
+                resendToken = token
+            },
+            onError = { error ->
+                errorMessage = error
+            },
+            onCancel = onCancel
+        )
+    } else {
+        OtpVerificationScreen(
+            viewModel = viewModel,
+            verificationId = verificationId!!,
+            forceResendingToken = resendToken,
+            onVerified = onVerified,
+            onResend = {
+                verificationId = null
+            },
+            onError = { error ->
+                errorMessage = error
+            },
+            onCancel = onCancel
+        )
+    }
+
+    // Mostrar errores si los hay
+    errorMessage?.let { error ->
+        LaunchedEffect(error) {
+            // Mostrar un snackbar o toast con el error
+            // ...
+
+            // Limpiar el error después de mostrarlo
+            delay(3000)
+            errorMessage = null
+        }
+    }
+}
 @Composable
 fun RegisterScreenMobile(
-    authManager: AuthManager,
+    viewModel: AuthViewModel = hiltViewModel(),
     forceResendingToken: PhoneAuthProvider.ForceResendingToken?,
     onVerificationSent: (String, PhoneAuthProvider.ForceResendingToken) -> Unit,
     onError: (String) -> Unit,
@@ -263,6 +346,26 @@ fun RegisterScreenMobile(
     var isLoading by remember { mutableStateOf(false) }
     val activity = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Observar el estado de verificación del teléfono
+    val phoneVerificationState by viewModel.phoneVerificationState.collectAsState()
+
+    // Efecto para manejar cambios en el estado de verificación
+    LaunchedEffect(phoneVerificationState) {
+        when (phoneVerificationState) {
+            is AuthViewModel.PhoneVerificationState.Loading -> isLoading = true
+            is AuthViewModel.PhoneVerificationState.CodeSent -> {
+                isLoading = false
+                val state = phoneVerificationState as AuthViewModel.PhoneVerificationState.CodeSent
+                onVerificationSent(state.verificationId, state.token)
+            }
+            is AuthViewModel.PhoneVerificationState.Error -> {
+                isLoading = false
+                onError((phoneVerificationState as AuthViewModel.PhoneVerificationState.Error).message)
+            }
+            else -> isLoading = false
+        }
+    }
 
     Card(
         modifier = Modifier
@@ -339,44 +442,18 @@ fun RegisterScreenMobile(
                 Button(
                     onClick = {
                         if (phoneNumber.isNotBlank()) {
-                            isLoading = true
-
                             keyboardController?.hide()
 
-                            val callbacks =
-                                object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                                    override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                                        // This will not be called for most phones since we're using manual verification
-                                        isLoading = false
-                                    }
-
-                                    override fun onVerificationFailed(e: FirebaseException) {
-                                        isLoading = false
-                                        onError("Error: ${e.message}")
-                                        e.printStackTrace()
-                                    }
-
-                                    override fun onCodeSent(
-                                        verificationId: String,
-                                        token: PhoneAuthProvider.ForceResendingToken
-                                    ) {
-                                        isLoading = false
-                                        onVerificationSent(verificationId, token)
-                                    }
-                                }
-
                             if (forceResendingToken != null) {
-                                authManager.resendVerificationCode(
+                                viewModel.resendVerificationCode(
                                     phoneNumber = phoneNumber,
                                     token = forceResendingToken,
-                                    activity = activity,
-                                    callbacks = callbacks
+                                    activity = activity
                                 )
                             } else {
-                                authManager.startPhoneVerification(
+                                viewModel.startPhoneVerification(
                                     phoneNumber = phoneNumber,
-                                    activity = activity,
-                                    callbacks = callbacks
+                                    activity = activity
                                 )
                             }
                         } else {

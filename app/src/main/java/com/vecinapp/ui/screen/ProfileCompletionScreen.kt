@@ -101,7 +101,7 @@ import coil.request.ImageRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
-import com.vecinapp.auth.AuthManager
+import com.vecinapp.data.repository.AuthRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
@@ -118,7 +118,7 @@ import kotlin.math.sqrt
 @Composable
 fun ProfileCompletionScreen(
     onComplete: () -> Unit,
-    authManager: AuthManager,
+    authManager: AuthRepository,
     onSeniorChange: suspend (Boolean) -> Unit,
     onFirstTimeChange: suspend (Boolean) -> Unit
 ) {
@@ -851,7 +851,7 @@ fun LocationStep(
     isDetecting: Boolean,
     onNext: () -> Unit,
     onBack: () -> Unit,
-    authManager: AuthManager,
+    authManager: AuthRepository,
     locationTimeout: Long = 10000L
 ) {
     val context = LocalContext.current
@@ -994,7 +994,7 @@ private fun detectCurrentLocation(
     locationTimeout: Long,
     onCoordinatesChange: (Double, Double) -> Unit,
     onLocationChange: (String) -> Unit,
-    authManager: AuthManager,
+    authManager: AuthRepository,
     onError: (String) -> Unit,
     onStart: () -> Unit,
     onFinish: () -> Unit

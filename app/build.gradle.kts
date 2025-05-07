@@ -6,6 +6,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.google.android.libraries.mapsplatform.secrets.gradle.plugin)
     alias(libs.plugins.google.firebase.crashlytics)
+    alias(libs.plugins.ksp) // si usas KSP
+    alias(libs.plugins.hilt)
 
 }
 
@@ -33,11 +35,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -45,7 +47,9 @@ android {
 }
 
 dependencies {
-
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler) // o kapt(libs.hilt.compiler) si usas kapt
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

@@ -103,7 +103,7 @@ import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthProvider
-import com.vecinapp.auth.AuthManager
+import com.vecinapp.data.repository.AuthRepository
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Date
@@ -126,7 +126,7 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     // Initialize AuthManager
-    val authManager = remember { AuthManager(context) }
+    val authManager = remember { AuthRepository(context) }
 
     // State for dialogs
     var showPhoneLinkingDialog by remember { mutableStateOf(false) }
@@ -134,7 +134,7 @@ fun SettingsScreen(
 
     // User state
     var user by remember { mutableStateOf<FirebaseUser?>(authManager.getCurrentUser()) }
-    var userProfile by remember { mutableStateOf<AuthManager.UserProfile?>(null) }
+    var userProfile by remember { mutableStateOf<AuthRepository.UserProfile?>(null) }
 
     // Load user profile data
     LaunchedEffect(user) {
@@ -608,7 +608,7 @@ fun SettingsScreen(
 
 @Composable
 fun ProfileEditDialog(
-    authManager: AuthManager,
+    authManager: AuthRepository,
     currentName: String,
     currentAge: Int,
     currentPhotoUri: Uri?,
@@ -1023,7 +1023,7 @@ fun ProfileEditDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhoneLinkingDialog(
-    authManager: AuthManager,
+    authManager: AuthRepository,
     onDismiss: () -> Unit,
     onSuccess: () -> Unit
 ) {

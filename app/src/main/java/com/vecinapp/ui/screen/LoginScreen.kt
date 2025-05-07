@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.R
-import com.vecinapp.auth.AuthManager
+import com.vecinapp.data.repository.AuthRepository
 import com.vecinapp.presentation.GoogleSignInButton
 import kotlinx.coroutines.launch
 
@@ -72,7 +72,7 @@ fun LoginScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Initialize AuthManager
-    val authManager = remember { AuthManager(context) }
+    val authManager = remember { AuthRepository(context) }
 
     // One-Tap Google setup
 // Inside the LoginScreen composable
