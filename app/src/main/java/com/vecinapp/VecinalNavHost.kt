@@ -21,7 +21,6 @@ import com.vecinapp.ui.screen.DashboardScreen
 import com.vecinapp.ui.screen.EventDetailScreen
 import com.vecinapp.ui.screen.EventosListScreen
 import com.vecinapp.ui.screen.LoginScreen
-import com.vecinapp.ui.screen.OnboardingModeScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.PanelDirectivoScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
@@ -57,10 +56,17 @@ fun VecinalNavHost(
     val authManager = remember { AuthManager(context) }
     val scope = rememberCoroutineScope()
 
+    // Store the original senior mode value to restore after profile completion
+    val originalSeniorMode = remember { isSenior }
+
+    // Hide navbar during profile completion
+    val showNavBar = remember(navController.currentDestination?.route) {
+        navController.currentDestination?.route != ScreenProfileCompletion.toRoute()
+    }
+
     NavHost(
         navController = navController, startDestination = when {
             user == null -> ScreenLogin
-            isFirstTime -> ScreenOnboarding
             else -> ScreenDashboard
         },
 
@@ -79,20 +85,6 @@ fun VecinalNavHost(
                     navController.navigate(ScreenProfileCompletion) {
                         popUpTo(ScreenLogin) { inclusive = true }
                     }
-                }
-            )
-        }
-
-        composable<ScreenOnboarding> {
-            OnboardingModeScreen(
-                onFirstTimeChange = { first ->
-                    scope.launch { onFirstTimeChange(first) }
-                },
-                onSeniorChange = { senior ->
-                    scope.launch { onSeniorChange(senior) }
-                },
-                onContinue = {
-                    navController.navigate(ScreenRegisterPhone)
                 }
             )
         }
@@ -144,20 +136,19 @@ fun VecinalNavHost(
 
         /* Completar datos de perfil tras OTP */
         composable<ScreenProfileCompletion> {
-            val isSeniorRemember by remember { mutableStateOf(isSenior) }
-            scope.launch {
-                onSeniorChange(false)
-            }
+            // No need to temporarily change the senior mode here
+            // The ProfileCompletionScreen will handle it internally
             ProfileCompletionScreen(
                 authManager = authManager,
-                onSeniorChange = onSeniorChange,
-                onComplete = {
-                    // una vez completado el perfil, vamos al dashboard
-
+                onSeniorChange = { newSeniorMode ->
+                    // This will be called when the user completes the profile
                     scope.launch {
-                        onSeniorChange(isSeniorRemember)
+                        onSeniorChange(newSeniorMode)
                     }
-
+                },
+                onFirstTimeChange = onFirstTimeChange,
+                onComplete = {
+                    // Navigate to dashboard after profile completion
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenRegisterPhone) { inclusive = true }
                     }
@@ -214,12 +205,14 @@ fun VecinalNavHost(
                 onSeniorChange = onSeniorChange,
                 onDarkChange = onDarkChange,
                 onDynamicChange = onDynamicChange,
-                onLinkPhone = { navController.navigate(ScreenRegisterPhone) },
                 onBack = { navController.popBackStack() },
                 onLoggedOut = onLoggedOut
             )
         }
     }
+
+    // You can use this showNavBar boolean to control the visibility of your navbar
+    // in your main activity or wherever your navbar is defined
 }
 
 interface Screen {
@@ -231,9 +224,6 @@ interface Screen {
 
 @Serializable
 object ScreenLogin : Screen
-
-@Serializable
-object ScreenOnboarding : Screen
 
 @Serializable
 object ScreenRegisterPhone : Screen

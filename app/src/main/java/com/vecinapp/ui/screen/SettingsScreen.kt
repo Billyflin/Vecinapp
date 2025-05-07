@@ -90,7 +90,6 @@ import com.vecinapp.auth.AuthManager
 import kotlinx.coroutines.launch
 import java.util.Date
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     isSenior: Boolean,
@@ -99,7 +98,6 @@ fun SettingsScreen(
     onSeniorChange: suspend (Boolean) -> Unit,
     onDarkChange: suspend (Boolean) -> Unit,
     onDynamicChange: suspend (Boolean) -> Unit,
-    onLinkPhone: () -> Unit,
     onBack: () -> Unit,
     onLoggedOut: () -> Unit = {},
     onEditProfile: () -> Unit = {}
@@ -634,7 +632,10 @@ fun PhoneLinkingDialog(
                 Text("Cancelar")
             }
         },
-        properties = DialogProperties(dismissOnBackPress = !isLoading, dismissOnClickOutside = !isLoading)
+        properties = DialogProperties(
+            dismissOnBackPress = !isLoading,
+            dismissOnClickOutside = !isLoading
+        )
     )
 }
 
@@ -732,7 +733,6 @@ fun SettingsScreenPreview() {
             onSeniorChange = {},
             onDarkChange = {},
             onDynamicChange = {},
-            onLinkPhone = {},
             onBack = {},
             onLoggedOut = {},
             onEditProfile = {}

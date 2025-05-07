@@ -331,26 +331,27 @@ fun RegisterScreenMobile(
                         if (phoneNumber.isNotBlank()) {
                             isLoading = true
 
-                            val callbacks = object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
-                                override fun onVerificationCompleted(credential: PhoneAuthCredential) {
-                                    // This will not be called for most phones since we're using manual verification
-                                    isLoading = false
-                                }
+                            val callbacks =
+                                object : PhoneAuthProvider.OnVerificationStateChangedCallbacks() {
+                                    override fun onVerificationCompleted(credential: PhoneAuthCredential) {
+                                        // This will not be called for most phones since we're using manual verification
+                                        isLoading = false
+                                    }
 
-                                override fun onVerificationFailed(e: FirebaseException) {
-                                    isLoading = false
-                                    onError("Error: ${e.message}")
-                                    e.printStackTrace()
-                                }
+                                    override fun onVerificationFailed(e: FirebaseException) {
+                                        isLoading = false
+                                        onError("Error: ${e.message}")
+                                        e.printStackTrace()
+                                    }
 
-                                override fun onCodeSent(
-                                    verificationId: String,
-                                    token: PhoneAuthProvider.ForceResendingToken
-                                ) {
-                                    isLoading = false
-                                    onVerificationSent(verificationId, token)
+                                    override fun onCodeSent(
+                                        verificationId: String,
+                                        token: PhoneAuthProvider.ForceResendingToken
+                                    ) {
+                                        isLoading = false
+                                        onVerificationSent(verificationId, token)
+                                    }
                                 }
-                            }
 
                             if (forceResendingToken != null) {
                                 authManager.resendVerificationCode(

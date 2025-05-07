@@ -79,7 +79,8 @@ fun LoginScreen(
     val launcher = rememberLauncherForActivityResult(StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             runCatching {
-                val cred = Identity.getSignInClient(context).getSignInCredentialFromIntent(result.data)
+                val cred =
+                    Identity.getSignInClient(context).getSignInCredentialFromIntent(result.data)
                 cred.googleIdToken?.let { idToken ->
                     isLoading = true
                     scope.launch {

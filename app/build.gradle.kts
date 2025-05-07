@@ -56,14 +56,14 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.firebase.auth.ktx)
-    implementation (libs.maps.compose)
-    implementation (libs.maps.ktx)
+    implementation(libs.maps.compose)
+    implementation(libs.maps.ktx)
     implementation(libs.androidx.material.icons.extended)
-    implementation (libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.onetapcompose)
 
-    implementation (libs.coil.compose)
+    implementation(libs.coil.compose)
     implementation(libs.firebase.firestore.ktx)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.play.services.auth)

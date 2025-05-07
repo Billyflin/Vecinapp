@@ -93,7 +93,8 @@ class AuthManager(private val context: Context) {
     ) {
         oneTapClient.beginSignIn(getGoogleSignInRequest())
             .addOnSuccessListener { result ->
-                val intentSenderRequest = IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
+                val intentSenderRequest =
+                    IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
                 onSuccess(intentSenderRequest)
             }
             .addOnFailureListener { e ->

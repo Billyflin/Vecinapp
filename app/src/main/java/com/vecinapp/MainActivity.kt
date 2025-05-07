@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
@@ -99,7 +98,7 @@ class MainActivity : ComponentActivity() {
                         })
                     }
                 }, bottomBar = {
-                    if (!seniorMode && !isFirstTime && user != null) {
+                    if ((seniorMode == false) && !isFirstTime && user != null) {
                         BottomNavigationBar(navController, user)
                     }
                 }) { inner ->
@@ -124,7 +123,7 @@ class MainActivity : ComponentActivity() {
                                 lifecycleScope.launch { prefs.updateIsFirstTime(v) }
                             },
                             onLoggedOut = {
-                                navController.popBackStack(ScreenOnboarding, inclusive = false)
+                                navController.popBackStack(ScreenLogin, inclusive = false)
                                 user = null
                             })
                     }
