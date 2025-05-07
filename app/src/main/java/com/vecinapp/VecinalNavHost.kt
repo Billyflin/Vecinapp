@@ -67,12 +67,20 @@ fun VecinalNavHost(
         modifier = Modifier.fillMaxSize()
     ) {
 
+
         composable<ScreenLogin> {
-            LoginScreen(onSignInSuccess = {
-                navController.navigate(ScreenDashboard) {
-                    popUpTo(ScreenLogin) { inclusive = true }
+            LoginScreen(
+                onSignInSuccess = {
+                    navController.navigate(ScreenDashboard) {
+                        popUpTo(ScreenLogin) { inclusive = true }
+                    }
+                },
+                onProfileIncomplete = {
+                    navController.navigate(ScreenProfileCompletion) {
+                        popUpTo(ScreenLogin) { inclusive = true }
+                    }
                 }
-            })
+            )
         }
 
         composable<ScreenOnboarding> {
@@ -136,10 +144,20 @@ fun VecinalNavHost(
 
         /* Completar datos de perfil tras OTP */
         composable<ScreenProfileCompletion> {
+            val isSeniorRemember by remember { mutableStateOf(isSenior) }
+            scope.launch {
+                onSeniorChange(false)
+            }
             ProfileCompletionScreen(
                 authManager = authManager,
+                onSeniorChange = onSeniorChange,
                 onComplete = {
                     // una vez completado el perfil, vamos al dashboard
+
+                    scope.launch {
+                        onSeniorChange(isSeniorRemember)
+                    }
+
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenRegisterPhone) { inclusive = true }
                     }
@@ -213,24 +231,34 @@ interface Screen {
 
 @Serializable
 object ScreenLogin : Screen
+
 @Serializable
 object ScreenOnboarding : Screen
+
 @Serializable
 object ScreenRegisterPhone : Screen
+
 @Serializable
 object ScreenProfileCompletion : Screen
+
 @Serializable
 object ScreenDashboard : Screen
+
 @Serializable
 object ScreenAnuncios : Screen
+
 @Serializable
 object ScreenEventos : Screen
+
 @Serializable
 object ScreenSugerencias : Screen
+
 @Serializable
 object ScreenTablon : Screen
+
 @Serializable
 object ScreenPanel : Screen
+
 @Serializable
 object ScreenSettings : Screen
 

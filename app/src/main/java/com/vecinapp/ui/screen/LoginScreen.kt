@@ -62,7 +62,8 @@ private sealed class LoginStep {
 
 @Composable
 fun LoginScreen(
-    onSignInSuccess: () -> Unit
+    onSignInSuccess: () -> Unit,
+    onProfileIncomplete: () -> Unit
 ) {
     var step by remember { mutableStateOf<LoginStep>(LoginStep.Choice) }
     var isLoading by remember { mutableStateOf(false) }
@@ -74,6 +75,7 @@ fun LoginScreen(
     val authManager = remember { AuthManager(context) }
 
     // One-Tap Google setup
+// Inside the LoginScreen composable
     val launcher = rememberLauncherForActivityResult(StartIntentSenderForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             runCatching {
@@ -82,9 +84,17 @@ fun LoginScreen(
                     isLoading = true
                     scope.launch {
                         authManager.firebaseAuthWithGoogle(idToken)
-                            .onSuccess {
-                                isLoading = false
-                                onSignInSuccess()
+                            .onSuccess { user ->
+                                // Check if profile is complete
+                                if (authManager.isProfileComplete(user.uid)) {
+                                    // Profile is complete, go to dashboard
+                                    isLoading = false
+                                    onSignInSuccess()
+                                } else {
+                                    // Profile is incomplete, go to profile completion
+                                    isLoading = false
+                                    onProfileIncomplete()
+                                }
                             }
                             .onFailure { e ->
                                 isLoading = false

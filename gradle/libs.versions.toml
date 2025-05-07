@@ -27,7 +27,8 @@ onetapcompose = "1.0.12"
 playServicesAuth        = "20.7.0"   # ← estable
 credentialsPlayServicesAuth = "1.2.2"
 firebaseCrashlyticsBuildtools = "3.0.3"
-firebaseStorageKtx = "21.0.1" # ← compatible con 20.7
+firebaseStorageKtx = "21.0.1"
+playServicesLocation = "21.3.0" # ← compatible con 20.7
 
 
 [libraries]
@@ -70,6 +71,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 onetapcompose = { module = "com.github.stevdza-san:OneTapCompose", version.ref = "onetapcompose" }
 firebase-crashlytics-buildtools = { group = "com.google.firebase", name = "firebase-crashlytics-buildtools", version.ref = "firebaseCrashlyticsBuildtools" }
 firebase-storage-ktx = { group = "com.google.firebase", name = "firebase-storage-ktx", version.ref = "firebaseStorageKtx" }
+play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 
 
 
