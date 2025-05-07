@@ -1,5 +1,5 @@
 [versions]
-agp = "8.9.2"
+agp = "8.10.0"
 auth = "2.1.0"
 firebaseBom = "33.13.0"
 kotlin = "2.0.21"
@@ -10,6 +10,7 @@ espressoCore = "3.6.1"
 datastorePreferences = "1.1.1"
 lifecycleRuntimeKtx = "2.8.7"
 lifecycleViewmodelCompose = "2.8.7"
+googleFirebaseCrashlytics = "3.0.3"
 activityCompose = "1.10.1"
 composeBom = "2025.04.01"
 mapsCompose = "6.6.0"
@@ -77,3 +78,4 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 google-android-libraries-mapsplatform-secrets-gradle-plugin = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "googleAndroidLibrariesMapsplatformSecretsGradlePlugin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
+google-firebase-crashlytics = { id = "com.google.firebase.crashlytics", version.ref = "googleFirebaseCrashlytics" }
