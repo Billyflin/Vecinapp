@@ -1184,7 +1184,9 @@ private fun saveProfileData(
                 photoUri = photoUrl ?: photoUri,
                 age = age,
                 location = location,
-                isComplete = true // Mark profile as complete
+                isComplete = true,
+                latitude = null,
+                longitude = null // Mark profile as complete
             ).onSuccess {
                 onLoading(false)
                 onSuccess()

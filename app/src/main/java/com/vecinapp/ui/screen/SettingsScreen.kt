@@ -1,6 +1,9 @@
 package com.vecinapp.ui.screen
 
+import android.net.Uri
 import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -14,6 +17,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +38,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ColorLens
@@ -41,6 +47,9 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
@@ -55,6 +64,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -62,7 +73,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -75,6 +90,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -82,13 +98,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.google.android.gms.location.LocationServices
 import com.google.firebase.FirebaseException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.Date
+import kotlin.math.abs
 
 @Composable
 fun SettingsScreen(
@@ -100,7 +119,7 @@ fun SettingsScreen(
     onDynamicChange: suspend (Boolean) -> Unit,
     onBack: () -> Unit,
     onLoggedOut: () -> Unit = {},
-    onEditProfile: () -> Unit = {}
+    onLinkPhone: () -> Unit = {}
 ) {
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
@@ -109,11 +128,21 @@ fun SettingsScreen(
     // Initialize AuthManager
     val authManager = remember { AuthManager(context) }
 
-    // State for phone linking dialog
+    // State for dialogs
     var showPhoneLinkingDialog by remember { mutableStateOf(false) }
+    var showProfileEditDialog by remember { mutableStateOf(false) }
 
     // User state
     var user by remember { mutableStateOf<FirebaseUser?>(authManager.getCurrentUser()) }
+    var userProfile by remember { mutableStateOf<AuthManager.UserProfile?>(null) }
+
+    // Load user profile data
+    LaunchedEffect(user) {
+        user?.let { firebaseUser ->
+            val profile = authManager.getUserProfile(firebaseUser.uid)
+            userProfile = profile
+        }
+    }
 
     // Listen for auth state changes
     DisposableEffect(Unit) {
@@ -133,6 +162,10 @@ fun SettingsScreen(
     val isEmailVerified = user?.isEmailVerified ?: false
     val creationTime = user?.metadata?.creationTimestamp?.let { Date(it) }
     val lastSignInTime = user?.metadata?.lastSignInTimestamp?.let { Date(it) }
+    val age = userProfile?.age
+    val location = userProfile?.location
+    val latitude = userProfile?.latitude
+    val longitude = userProfile?.longitude
 
     // Animación para el indicador de modo
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -233,7 +266,7 @@ fun SettingsScreen(
 
                             // Edit button
                             IconButton(
-                                onClick = onEditProfile,
+                                onClick = { showProfileEditDialog = true },
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
@@ -287,6 +320,70 @@ fun SettingsScreen(
                                         tint = MaterialTheme.colorScheme.tertiary
                                     )
                                 }
+                            }
+                        }
+
+                        // Age and Location
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        ) {
+                            if (age != null) {
+                                Icon(
+                                    imageVector = Icons.Default.Cake,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "$age años",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                            }
+
+                            if (location != null) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = location,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        // Coordinates
+                        if (latitude != null && longitude != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MyLocation,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Lat: ${String.format("%.6f", latitude)}, Lon: ${String.format("%.6f", longitude)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                             }
                         }
 
@@ -492,6 +589,435 @@ fun SettingsScreen(
             onSuccess = { showPhoneLinkingDialog = false }
         )
     }
+
+    // Profile Edit Dialog
+    if (showProfileEditDialog) {
+        ProfileEditDialog(
+            authManager = authManager,
+            currentName = displayName,
+            currentAge = age ?: 30,
+            currentPhotoUri = photoUrl?.toString()?.let { Uri.parse(it) },
+            currentLocation = location ?: "",
+            currentLatitude = latitude ?: 0.0,
+            currentLongitude = longitude ?: 0.0,
+            onDismiss = { showProfileEditDialog = false },
+            onSuccess = { showProfileEditDialog = false }
+        )
+    }
+}
+
+@Composable
+fun ProfileEditDialog(
+    authManager: AuthManager,
+    currentName: String,
+    currentAge: Int,
+    currentPhotoUri: Uri?,
+    currentLocation: String,
+    currentLatitude: Double,
+    currentLongitude: Double,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    var displayName by remember { mutableStateOf(currentName) }
+    var age by remember { mutableIntStateOf(currentAge) }
+    var ageSliderPosition by remember { mutableFloatStateOf(currentAge.toFloat()) }
+    var photoUri by remember { mutableStateOf(currentPhotoUri) }
+    var locationName by remember { mutableStateOf(currentLocation) }
+    var latitude by remember { mutableDoubleStateOf(currentLatitude) }
+    var longitude by remember { mutableDoubleStateOf(currentLongitude) }
+    var isLoading by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isDetectingLocation by remember { mutableStateOf(false) }
+    var isGettingAddress by remember { mutableStateOf(false) }
+
+    // Photo picker launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { photoUri = it }
+    }
+
+    // Update age when slider moves
+    LaunchedEffect(ageSliderPosition) {
+        age = ageSliderPosition.toInt()
+    }
+
+    // Function to detect current location
+    fun detectCurrentLocation() {
+        isDetectingLocation = true
+        errorMessage = null
+
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+
+        try {
+            scope.launch {
+                try {
+                    val locationResult = fusedLocationClient.lastLocation.await()
+                    if (locationResult != null) {
+                        latitude = locationResult.latitude
+                        longitude = locationResult.longitude
+
+                        // Get city name from coordinates
+                        isGettingAddress = true
+                        authManager.getCityFromLocation(latitude, longitude)
+                            .onSuccess { city ->
+                                locationName = city
+                                isGettingAddress = false
+                            }
+                            .onFailure { e ->
+                                errorMessage = "Error al obtener ciudad: ${e.message}"
+                                isGettingAddress = false
+                            }
+
+                        isDetectingLocation = false
+                    } else {
+                        errorMessage = "No se pudo obtener la ubicación. Intenta más tarde."
+                        isDetectingLocation = false
+                    }
+                } catch (e: Exception) {
+                    errorMessage = "Error al obtener ubicación: ${e.message}"
+                    isDetectingLocation = false
+                }
+            }
+        } catch (e: SecurityException) {
+            errorMessage = "Permiso de ubicación denegado"
+            isDetectingLocation = false
+        }
+    }
+
+    // Function to get city when coordinates change
+    fun updateCityFromCoordinates() {
+        if (latitude != 0.0 && longitude != 0.0) {
+            isGettingAddress = true
+            errorMessage = null
+
+            scope.launch {
+                authManager.getCityFromLocation(latitude, longitude)
+                    .onSuccess { city ->
+                        locationName = city
+                        isGettingAddress = false
+                    }
+                    .onFailure { e ->
+                        errorMessage = "Error al obtener ciudad: ${e.message}"
+                        isGettingAddress = false
+                    }
+            }
+        }
+    }
+
+    // Update city when coordinates change significantly
+    LaunchedEffect(latitude, longitude) {
+        if ((abs(latitude - currentLatitude) > 0.01 || abs(longitude - currentLongitude) > 0.01) &&
+            !isDetectingLocation) {
+            updateCityFromCoordinates()
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!isLoading) onDismiss() },
+        title = { Text("Editar perfil") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Profile photo
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { photoPickerLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (photoUri != null) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(context)
+                                    .data(photoUri)
+                                    .crossfade(true)
+                                    .build(),
+                                contentDescription = "Foto de perfil",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+
+                            // Edit overlay
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.3f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Cambiar foto",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.AddAPhoto,
+                                contentDescription = "Añadir foto",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(40.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Name field
+                OutlinedTextField(
+                    value = displayName,
+                    onValueChange = { displayName = it },
+                    label = { Text("Nombre") },
+                    placeholder = { Text("Tu nombre completo") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = displayName.isBlank()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Age slider
+                Text(
+                    text = "Edad: $age años",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Slider(
+                    value = ageSliderPosition,
+                    onValueChange = { ageSliderPosition = it },
+                    valueRange = 18f..100f,
+                    steps = 82,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary,
+                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "18",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "100",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Location name field (City)
+                OutlinedTextField(
+                    value = locationName,
+                    onValueChange = { locationName = it },
+                    label = { Text("Ciudad") },
+                    placeholder = { Text("Ej: Temuco, Santiago, etc.") },
+                    leadingIcon = { Icon(Icons.Default.LocationCity, contentDescription = null) },
+                    trailingIcon = {
+                        if (isGettingAddress) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Words
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Latitude and Longitude fields
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = latitude.toString(),
+                        onValueChange = {
+                            try {
+                                latitude = it.toDouble()
+                            } catch (e: NumberFormatException) {
+                                // Ignore invalid input
+                            }
+                        },
+                        label = { Text("Latitud") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal
+                        ),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+
+                    OutlinedTextField(
+                        value = longitude.toString(),
+                        onValueChange = {
+                            try {
+                                longitude = it.toDouble()
+                            } catch (e: NumberFormatException) {
+                                // Ignore invalid input
+                            }
+                        },
+                        label = { Text("Longitud") },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Decimal
+                        ),
+                        modifier = Modifier.weight(1f),
+                        singleLine = true
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Detect location button
+                Button(
+                    onClick = { detectCurrentLocation() },
+                    enabled = !isDetectingLocation && !isLoading && !isGettingAddress,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                ) {
+                    if (isDetectingLocation) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.MyLocation,
+                            contentDescription = null
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Text("Detectar mi ubicación actual")
+                }
+
+                // Error message
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = errorMessage!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                // Loading indicator
+                if (isLoading) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .align(Alignment.CenterHorizontally)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (displayName.isBlank()) {
+                        errorMessage = "El nombre no puede estar vacío"
+                        return@Button
+                    }
+
+                    scope.launch {
+                        isLoading = true
+                        errorMessage = null
+
+                        val user = authManager.getCurrentUser()
+                        if (user == null) {
+                            isLoading = false
+                            errorMessage = "No se pudo obtener la información del usuario"
+                            return@launch
+                        }
+
+                        try {
+                            // Upload photo if it's a new one
+                            var photoUrl: Uri? = null
+                            if (photoUri != null && !photoUri.toString().startsWith("http")) {
+                                authManager.uploadProfilePhoto(photoUri!!)
+                                    .onSuccess { url -> photoUrl = url }
+                                    .onFailure { throw it }
+                            }
+
+                            // Update profile
+                            authManager.updateUserProfile(
+                                userId = user.uid,
+                                displayName = displayName,
+                                photoUri = photoUrl ?: photoUri,
+                                age = age,
+                                location = locationName, // Now this will be the city name
+                                latitude = latitude,
+                                longitude = longitude,
+                                isComplete = true
+                            ).onSuccess {
+                                isLoading = false
+                                onSuccess()
+                            }.onFailure {
+                                throw it
+                            }
+                        } catch (e: Exception) {
+                            isLoading = false
+                            errorMessage = "Error al actualizar el perfil: ${e.message}"
+                        }
+                    }
+                },
+                enabled = !isLoading && displayName.isNotBlank() && !isDetectingLocation && !isGettingAddress
+            ) {
+                Text("Guardar")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("Cancelar")
+            }
+        },
+        properties = DialogProperties(
+            dismissOnBackPress = !isLoading,
+            dismissOnClickOutside = !isLoading
+        )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -735,7 +1261,7 @@ fun SettingsScreenPreview() {
             onDynamicChange = {},
             onBack = {},
             onLoggedOut = {},
-            onEditProfile = {}
+            onLinkPhone = {}
         )
     }
 }

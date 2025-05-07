@@ -2,6 +2,7 @@ package com.vecinapp.auth
 
 import android.app.Activity
 import android.content.Context
+import android.location.Geocoder
 import android.net.Uri
 import android.util.Log
 import androidx.activity.result.IntentSenderRequest
@@ -19,12 +20,23 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.storage.FirebaseStorage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
+import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /**
  * Centralized manager for all authentication operations
@@ -231,7 +243,6 @@ class AuthManager(private val context: Context) {
     companion object {
         private const val TAG = "AuthManager"
     }
-    // Add these methods to your AuthManager.kt file
 
     /**
      * User profile data class
@@ -241,7 +252,8 @@ class AuthManager(private val context: Context) {
         val photoUrl: Uri? = null,
         val age: Int? = null,
         val location: String? = null,
-        // Add other profile fields as needed
+        val latitude: Double? = null,
+        val longitude: Double? = null,
         val isProfileComplete: Boolean = false
     )
 
@@ -258,7 +270,9 @@ class AuthManager(private val context: Context) {
             // For example, we require displayName, age, and location
             return userProfile.displayName != null &&
                     userProfile.age != null &&
-                    userProfile.location != null
+                    userProfile.location != null &&
+                    userProfile.latitude != null &&
+                    userProfile.longitude != null
         } catch (e: Exception) {
             Log.e(TAG, "Error checking profile completeness: ${e.message}")
             return false
@@ -284,6 +298,8 @@ class AuthManager(private val context: Context) {
                 // User has a profile document in Firestore
                 val age = userDoc.getLong("age")?.toInt()
                 val location = userDoc.getString("location")
+                val latitude = userDoc.getDouble("latitude")
+                val longitude = userDoc.getDouble("longitude")
                 val isComplete = userDoc.getBoolean("isProfileComplete") ?: false
 
                 UserProfile(
@@ -291,6 +307,8 @@ class AuthManager(private val context: Context) {
                     photoUrl = authUser?.photoUrl?.let { Uri.parse(it.toString()) },
                     age = age,
                     location = location,
+                    latitude = latitude,
+                    longitude = longitude,
                     isProfileComplete = isComplete
                 )
             } else {
@@ -316,6 +334,8 @@ class AuthManager(private val context: Context) {
         photoUri: Uri? = null,
         age: Int? = null,
         location: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
         isComplete: Boolean = false
     ): Result<UserProfile> {
         return try {
@@ -335,6 +355,8 @@ class AuthManager(private val context: Context) {
             val profileData = mutableMapOf<String, Any>()
             age?.let { profileData["age"] = it }
             location?.let { profileData["location"] = it }
+            latitude?.let { profileData["latitude"] = it }
+            longitude?.let { profileData["longitude"] = it }
             profileData["isProfileComplete"] = isComplete
             profileData["updatedAt"] = FieldValue.serverTimestamp()
 
@@ -351,6 +373,8 @@ class AuthManager(private val context: Context) {
                 photoUrl = user.photoUrl?.let { Uri.parse(it.toString()) },
                 age = age,
                 location = location,
+                latitude = latitude,
+                longitude = longitude,
                 isProfileComplete = isComplete
             )
 
@@ -379,4 +403,266 @@ class AuthManager(private val context: Context) {
             Result.failure(e)
         }
     }
+    /**
+     * Get only the city name from latitude and longitude
+     * Makes multiple attempts to get a valid city name
+     */
+    suspend fun getCityFromLocation(latitude: Double, longitude: Double): Result<String> {
+        return try {
+            val geocoder = Geocoder(context, Locale.getDefault())
+
+            // For Android 13+ (API 33+)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                var cityResult = ""
+                val latch = CountDownLatch(1)
+
+                geocoder.getFromLocation(latitude, longitude, 5) { addresses ->
+                    if (addresses.isNotEmpty()) {
+                        // Try multiple addresses to find one with a valid locality
+                        for (address in addresses) {
+                            // First priority: locality (city)
+                            if (!address.locality.isNullOrEmpty()) {
+                                cityResult = address.locality
+                                break
+                            }
+
+                            // Second priority: subAdminArea (county/district)
+                            if (!address.subAdminArea.isNullOrEmpty()) {
+                                cityResult = address.subAdminArea
+                                // Don't break, keep looking for a locality
+                            }
+
+                            // Third priority: adminArea (state/province)
+                            if (cityResult.isEmpty() && !address.adminArea.isNullOrEmpty()) {
+                                cityResult = address.adminArea
+                            }
+                        }
+
+                        // If still no result, try to parse from address line
+                        if (cityResult.isEmpty() && addresses[0].maxAddressLineIndex >= 0) {
+                            val addressLine = addresses[0].getAddressLine(0)
+                            // Try to extract city from address line
+                            val parts = addressLine.split(',')
+                            if (parts.size >= 2) {
+                                // Usually the city is the second component in the address
+                                cityResult = parts[1].trim()
+                            } else if (parts.isNotEmpty()) {
+                                cityResult = parts[0].trim()
+                            }
+                        }
+                    }
+                    latch.countDown()
+                }
+
+                // Wait for the geocoder callback to complete (with timeout)
+                latch.await(2, TimeUnit.SECONDS)
+
+                if (cityResult.isNotEmpty()) {
+                    Result.success(cityResult)
+                } else {
+                    // If geocoder failed, try reverse geocoding with a different approach
+                    val result = reverseGeocodeFallback(latitude, longitude)
+                    if (result.isNotEmpty()) {
+                        Result.success(result)
+                    } else {
+                        // Last resort: use a geographic region approximation
+                        Result.success(approximateLocationToCity(latitude, longitude))
+                    }
+                }
+            } else {
+                // For older Android versions
+                @Suppress("DEPRECATION")
+                val addresses = geocoder.getFromLocation(latitude, longitude, 5)
+
+                if (addresses != null && addresses.isNotEmpty()) {
+                    var cityResult = ""
+
+                    // Try multiple addresses to find one with a valid locality
+                    for (address in addresses) {
+                        // First priority: locality (city)
+                        if (!address.locality.isNullOrEmpty()) {
+                            cityResult = address.locality
+                            break
+                        }
+
+                        // Second priority: subAdminArea (county/district)
+                        if (!address.subAdminArea.isNullOrEmpty()) {
+                            cityResult = address.subAdminArea
+                            // Don't break, keep looking for a locality
+                        }
+
+                        // Third priority: adminArea (state/province)
+                        if (cityResult.isEmpty() && !address.adminArea.isNullOrEmpty()) {
+                            cityResult = address.adminArea
+                        }
+                    }
+
+                    // If still no result, try to parse from address line
+                    if (cityResult.isEmpty() && addresses[0].maxAddressLineIndex >= 0) {
+                        val addressLine = addresses[0].getAddressLine(0)
+                        // Try to extract city from address line
+                        val parts = addressLine.split(',')
+                        if (parts.size >= 2) {
+                            // Usually the city is the second component in the address
+                            cityResult = parts[1].trim()
+                        } else if (parts.isNotEmpty()) {
+                            cityResult = parts[0].trim()
+                        }
+                    }
+
+                    if (cityResult.isNotEmpty()) {
+                        Result.success(cityResult)
+                    } else {
+                        // If geocoder failed, try reverse geocoding with a different approach
+                        val result = reverseGeocodeFallback(latitude, longitude)
+                        if (result.isNotEmpty()) {
+                            Result.success(result)
+                        } else {
+                            // Last resort: use a geographic region approximation
+                            Result.success(approximateLocationToCity(latitude, longitude))
+                        }
+                    }
+                } else {
+                    // If geocoder returned no addresses, try fallback methods
+                    val result = reverseGeocodeFallback(latitude, longitude)
+                    if (result.isNotEmpty()) {
+                        Result.success(result)
+                    } else {
+                        // Last resort: use a geographic region approximation
+                        Result.success(approximateLocationToCity(latitude, longitude))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting city from location: ${e.message}")
+            // Try fallback methods even on exception
+            try {
+                val result = reverseGeocodeFallback(latitude, longitude)
+                if (result.isNotEmpty()) {
+                    Result.success(result)
+                } else {
+                    // Last resort: use a geographic region approximation
+                    Result.success(approximateLocationToCity(latitude, longitude))
+                }
+            } catch (e2: Exception) {
+                Log.e(TAG, "Error in fallback geocoding: ${e2.message}")
+                Result.success(approximateLocationToCity(latitude, longitude))
+            }
+        }
+    }
+
+    /**
+     * Fallback method to get city name using a network request to a geocoding service
+     * This is used when the Android Geocoder fails
+     */
+    private suspend fun reverseGeocodeFallback(latitude: Double, longitude: Double): String {
+        return try {
+            // Use a simple HTTP request to OpenStreetMap Nominatim API
+            // Note: In a production app, you should use a proper geocoding service with an API key
+            val url = "https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude&zoom=10"
+
+            val client = OkHttpClient.Builder()
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(5, TimeUnit.SECONDS)
+                .build()
+
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "VecinApp Android Client")
+                .build()
+
+            withContext(Dispatchers.IO) {
+                val response = client.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val jsonString = response.body?.string() ?: ""
+                    val jsonObject = JSONObject(jsonString)
+
+                    // Try to extract city from the response
+                    val address = jsonObject.optJSONObject("address")
+                    if (address != null) {
+                        // Try different fields that might contain the city name
+                        when {
+                            address.has("city") -> address.getString("city")
+                            address.has("town") -> address.getString("town")
+                            address.has("village") -> address.getString("village")
+                            address.has("municipality") -> address.getString("municipality")
+                            address.has("county") -> address.getString("county")
+                            address.has("state") -> address.getString("state")
+                            else -> ""
+                        }
+                    } else {
+                        ""
+                    }
+                } else {
+                    ""
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in reverseGeocodeFallback: ${e.message}")
+            ""
+        }
+    }
+
+    /**
+     * Approximate a location to a city based on geographic regions
+     * This is a last resort when all geocoding methods fail
+     */
+    private fun approximateLocationToCity(latitude: Double, longitude: Double): String {
+        // Define some major cities with their approximate coordinates
+        val cities = listOf(
+            Pair("Santiago", Pair(-33.4489, -70.6693)),
+            Pair("Temuco", Pair(-38.7359, -72.5904)),
+            Pair("Concepción", Pair(-36.8201, -73.0440)),
+            Pair("Valparaíso", Pair(-33.0472, -71.6127)),
+            Pair("Antofagasta", Pair(-23.6509, -70.3975)),
+            Pair("La Serena", Pair(-29.9027, -71.2525)),
+            Pair("Puerto Montt", Pair(-41.4693, -72.9424)),
+            Pair("Arica", Pair(-18.4783, -70.3126)),
+            Pair("Iquique", Pair(-20.2208, -70.1431)),
+            Pair("Rancagua", Pair(-34.1708, -70.7444)),
+            Pair("Talca", Pair(-35.4264, -71.6553)),
+            Pair("Chillán", Pair(-36.6064, -72.1034)),
+            Pair("Calama", Pair(-22.4524, -68.9204)),
+            Pair("Osorno", Pair(-40.5714, -73.1392)),
+            Pair("Valdivia", Pair(-39.8142, -73.2459))
+        )
+
+        // Find the closest city based on distance
+        var closestCity = "Santiago" // Default to Santiago if no match
+        var minDistance = Double.MAX_VALUE
+
+        for ((cityName, coords) in cities) {
+            val cityLat = coords.first
+            val cityLon = coords.second
+
+            // Calculate distance using Haversine formula
+            val distance = calculateDistance(latitude, longitude, cityLat, cityLon)
+
+            if (distance < minDistance) {
+                minDistance = distance
+                closestCity = cityName
+            }
+        }
+
+        return closestCity
+    }
+
+    /**
+     * Calculate distance between two points using Haversine formula
+     */
+    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371 // Earth radius in kilometers
+
+        val latDistance = Math.toRadians(lat2 - lat1)
+        val lonDistance = Math.toRadians(lon2 - lon1)
+
+        val a = sin(latDistance / 2) * sin(latDistance / 2) +
+                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+                sin(lonDistance / 2) * sin(lonDistance / 2)
+
+        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+        return r * c
+    }
+
 }
