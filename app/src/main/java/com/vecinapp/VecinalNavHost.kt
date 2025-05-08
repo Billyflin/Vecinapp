@@ -1,39 +1,31 @@
 package com.vecinapp
 
+import android.util.Log
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.vecinapp.ui.screen.AnunciosScreen
-import com.vecinapp.ui.screen.CreateComunityScreen
+import com.vecinapp.ui.screen.DashboardScreen
 import com.vecinapp.ui.screen.LoginScreen
-import com.vecinapp.ui.screen.PanelDirectivoScreen
-import com.vecinapp.ui.screen.SettingsScreen
-import com.vecinapp.ui.screen.TablonListScreen
-import com.vecinapp.ui.viewmodel.CommunityViewModel
+import com.vecinapp.ui.screen.ProfileCompletionScreen
+import com.vecinapp.ui.viewmodel.MainViewModel
 import kotlinx.serialization.Serializable
 
 @Composable
 fun VecinalNavHost(
-    navController: NavHostController = rememberNavController(),
+    navController: NavHostController = rememberNavController()
 ) {
-    // Obtenemos el ViewModel monolítico
-    val viewModel: CommunityViewModel = hiltViewModel()
+    val mainVM: MainViewModel = hiltViewModel(activity)
 
-    // Observamos los estados relevantes
-    val authState by viewModel.authState.collectAsState()
-    val preferencesState by viewModel.preferencesState.collectAsState()
-    val communityState by viewModel.communityState.collectAsState()
-
-    // Extraemos los valores del estado para mayor claridad
-    val isSenior = preferencesState.seniorMode
-    val user = authState.user
+    val user = mainVM.authState.collectAsState().value.user
+    Log.e("User", user.toString())
 
     NavHost(
         navController = navController, startDestination = when {
@@ -43,7 +35,7 @@ fun VecinalNavHost(
     ) {
         composable<ScreenLogin> {
             LoginScreen(
-                onSignInSuccess = {
+                onSuccess = {
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenLogin) { inclusive = true }
                     }
@@ -55,50 +47,33 @@ fun VecinalNavHost(
                 }
             )
         }
-
-        composable<ScreenCreateComunity> {
-            CreateComunityScreen(
-                onNavigateBack = { navController.popBackStack() },
-                onCommunityCreated = {
+        composable<ScreenProfileCompletion> {
+            ProfileCompletionScreen(
+                onDone = {
                     navController.navigate(ScreenDashboard) {
-                        popUpTo(ScreenCreateComunity) { inclusive = true }
+                        popUpTo(ScreenProfileCompletion) { inclusive = true }
                     }
                 }
             )
         }
 
-
-
-        composable<ScreenAnuncios> {
-            // Pasar el ID de la comunidad seleccionada
-            val selectedCommunityId = communityState.selectedCommunity?.id ?: ""
-            AnunciosScreen(
-            )
-        }
-
-
-
-
-
-        composable<ScreenTablon> {
-            TablonListScreen()
-        }
-
-        composable<ScreenPanel> {
-            PanelDirectivoScreen()
-        }
-
-        composable<ScreenSettings> {
-            SettingsScreen(
-                onBack = { navController.popBackStack() },
-                onLoggedOut = {
-                    navController.popBackStack(ScreenLogin, inclusive = false)
-
-                }
-            )
+        composable<ScreenDashboard> {
+            if (user != null) {
+                DashboardScreen(
+                    userName = user.name.ifBlank { "Vecino" },
+                    onLogout = {
+                        viewModel.logout()
+                        navController.navigate(ScreenLogin) {
+                            popUpTo(ScreenDashboard) { inclusive = true }
+                        }
+                    }
+                )
+            }
         }
     }
 }
+
+
 
 
 interface Screen {
@@ -109,40 +84,14 @@ interface Screen {
 }
 
 @Serializable
-object ScreenCreateComunity : Screen
-
-@Serializable
-object ScreenJoinComunity : Screen
-
-@Serializable
-object ScreenCreateEvent : Screen
-
-@Serializable
 object ScreenLogin : Screen
-
-@Serializable
-object ScreenRegisterPhone : Screen
-
-@Serializable
-object ScreenProfileCompletion : Screen
 
 @Serializable
 object ScreenDashboard : Screen
 
 @Serializable
-object ScreenAnuncios : Screen
+object ScreenProfileCompletion : Screen
 
-@Serializable
-object ScreenEventos : Screen
-
-@Serializable
-object ScreenSugerencias : Screen
-
-@Serializable
-object ScreenTablon : Screen
-
-@Serializable
-object ScreenPanel : Screen
 
 @Serializable
 object ScreenSettings : Screen

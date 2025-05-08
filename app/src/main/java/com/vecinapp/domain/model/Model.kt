@@ -179,9 +179,7 @@ data class Event(
     val endDate: Timestamp? = null
 )
 
-/**
- * Modelo de usuario
- */
+@Serializable
 data class User(
     val id: String = "",
     val email: String = "",
@@ -190,9 +188,16 @@ data class User(
     val photoUrl: String? = null,
     @Contextual @ServerTimestamp
     val createdAt: Timestamp? = null,
+
+    // ――― NUEVOS CAMPOS ―――
+    val isProfileComplete: Boolean = false,          // <─ bandera simple
+    val latitude: Double? = null,                    // opcional para “Mi ubicación”
+    val longitude: Double? = null,
+
     val communities: List<String> = emptyList(),
     val notificationTokens: List<String> = emptyList()
 )
+
 
 /**
  * Propuesta/votación dentro de la comunidad.
