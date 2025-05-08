@@ -2,115 +2,82 @@ package com.vecinapp.di
 
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.ktx.auth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.FirebaseStorage
-import com.vecinapp.community.CommunityManager
+import com.google.firebase.storage.ktx.storage
 import com.vecinapp.data.preferences.UserPreferencesManager
-import com.vecinapp.data.repository.AuthRepository
-import com.vecinapp.data.repository.UserRepository
+import com.vecinapp.data.repository.CommunityRepository
+import com.vecinapp.data.service.LocationService
+import com.vecinapp.domain.service.ICommunityService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
-import okhttp3.OkHttpClient
-import java.util.concurrent.TimeUnit
 import javax.inject.Singleton
 
-
-// FirebaseModule.kt - Solo proporciona servicios de Firebase
 @Module
 @InstallIn(SingletonComponent::class)
-object FirebaseModule {
+object AppModule {
 
+    // Firebase
     @Provides
     @Singleton
     fun provideFirebaseAuth(): FirebaseAuth {
-        return FirebaseAuth.getInstance()
+        return Firebase.auth
     }
 
     @Provides
     @Singleton
     fun provideFirebaseFirestore(): FirebaseFirestore {
-        return FirebaseFirestore.getInstance()
+        return Firebase.firestore
     }
 
     @Provides
     @Singleton
     fun provideFirebaseStorage(): FirebaseStorage {
-        return FirebaseStorage.getInstance()
+        return Firebase.storage
     }
-}
 
-// NetworkModule.kt - Proporciona servicios de red
-@Module
-@InstallIn(SingletonComponent::class)
-object NetworkModule {
-
+    // Preferencias
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
-        return OkHttpClient.Builder()
-            .connectTimeout(10, TimeUnit.SECONDS)
-            .readTimeout(10, TimeUnit.SECONDS)
-            .writeTimeout(10, TimeUnit.SECONDS)
-            .build()
-    }
-}
-
-// DataStoreModule.kt - Proporciona servicios de almacenamiento de preferencias
-@Module
-@InstallIn(SingletonComponent::class)
-object DataStoreModule {
-
-    @Provides
-    @Singleton
-    fun provideUserPreferencesManager(
-        @ApplicationContext context: Context
-    ): UserPreferencesManager {
+    fun provideUserPreferencesManager(@ApplicationContext context: Context): UserPreferencesManager {
         return UserPreferencesManager(context)
     }
-}
 
-// RepositoryModule.kt - Proporciona repositorios
-@Module
-@InstallIn(SingletonComponent::class)
-object RepositoryModule {
-
+    // Servicios
     @Provides
     @Singleton
-    fun provideAuthRepository(
-        @ApplicationContext context: Context,
+    fun provideLocationService(@ApplicationContext context: Context): LocationService {
+        return LocationService(context)
+    }
+
+    // Repositorio principal
+    @Provides
+    @Singleton
+    fun provideCommunityService(
         auth: FirebaseAuth,
         firestore: FirebaseFirestore,
         storage: FirebaseStorage,
-        httpClient: OkHttpClient
-    ): AuthRepository {
-        return AuthRepository(context, auth, firestore, storage, httpClient)
+        preferencesManager: UserPreferencesManager,
+        locationService: LocationService
+    ): ICommunityService {
+        return CommunityRepository(
+            auth = auth,
+            firestore = firestore,
+            storage = storage,
+            preferencesManager = preferencesManager
+        )
     }
 
+    // Otros providers que puedan ser necesarios
     @Provides
     @Singleton
-    fun provideUserRepository(
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth
-    ): UserRepository {
-        return UserRepository(firestore, auth)
-    }
-}
-
-// CommunityModule.kt - Proporciona servicios de comunidad
-@Module
-@InstallIn(SingletonComponent::class)
-object CommunityModule {
-
-    @Provides
-    @Singleton
-    fun provideCommunityManager(
-        @ApplicationContext context: Context,
-        firestore: FirebaseFirestore,
-        auth: FirebaseAuth
-    ): CommunityManager {
-        return CommunityManager(context, firestore, auth)
+    fun provideApplicationContext(@ApplicationContext context: Context): Context {
+        return context
     }
 }

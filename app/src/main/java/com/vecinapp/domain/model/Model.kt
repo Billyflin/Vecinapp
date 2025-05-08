@@ -107,7 +107,8 @@ data class Rsvp(
 data class Vote(
     val userId: String = "",
     @Contextual @ServerTimestamp
-    val votedAt: Timestamp? = null
+    val votedAt: Timestamp? = null,
+    val approve: Boolean
 )
 
 /**
@@ -144,7 +145,8 @@ data class Announcement(
     val comments: List<Comment> = emptyList(),
     val rsvps: List<Rsvp> = emptyList(),
     val reports: List<Report> = emptyList(),
-    val voteCount: Int = 0
+    val voteCount: Int = 0,
+    val content: String = ""
 )
 
 /**
@@ -169,7 +171,27 @@ data class Event(
     val comments: List<Comment> = emptyList(),
     val rsvps: List<Rsvp> = emptyList(),
     val reports: List<Report> = emptyList(),
-    val voteCount: Int = 0
+    val voteCount: Int = 0,
+    val attendees: List<String> = emptyList(),
+    @Contextual
+    val startDate: Timestamp? = null,
+    @Contextual
+    val endDate: Timestamp? = null
+)
+
+/**
+ * Modelo de usuario
+ */
+data class User(
+    val id: String = "",
+    val email: String = "",
+    val name: String = "",
+    val phone: String? = null,
+    val photoUrl: String? = null,
+    @Contextual @ServerTimestamp
+    val createdAt: Timestamp? = null,
+    val communities: List<String> = emptyList(),
+    val notificationTokens: List<String> = emptyList()
 )
 
 /**
@@ -189,7 +211,10 @@ data class Proposal(
     val comments: List<Comment> = emptyList(),
     val votes: List<Vote> = emptyList(),
     val reports: List<Report> = emptyList(),
-    val voteCount: Int = 0
+    val voteCount: Int = 0,
+    @Contextual @ServerTimestamp
+    val expiresAt: Timestamp? = null,
+    val status: Status = Status.PENDING
 )
 
 /**

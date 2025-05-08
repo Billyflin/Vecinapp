@@ -1,5 +1,6 @@
 package com.vecinapp
 
+import android.app.Application
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,15 +24,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vecinapp.presentation.BottomNavigationBar
 import com.vecinapp.ui.theme.VecinappTheme
-import com.vecinapp.ui.viewmodel.MainViewModel
+import com.vecinapp.ui.viewmodel.CommunityViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.HiltAndroidApp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // Inyectamos el ViewModel con Hilt
-    private val viewModel: MainViewModel by viewModels()
+    // Inyectamos el ViewModel monolítico con Hilt
+    private val viewModel: CommunityViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,20 +42,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
 
-            // Observamos el estado de la UI desde el ViewModel
-            val uiState by viewModel.uiState.collectAsState()
+            // Observamos los estados desde el ViewModel monolítico
+            val authState by viewModel.authState.collectAsState()
+            val preferencesState by viewModel.preferencesState.collectAsState()
+
+            // Determinamos si es la primera vez (podría ser una propiedad en preferencesState)
+            val isFirstTime = false // Esto debería venir de preferencias
 
             val backStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = backStackEntry?.destination?.route
 
             // Usamos los valores del estado de la UI
             VecinappTheme(
-                darkTheme = uiState.darkMode,
-                dynamicColor = uiState.dynamicColor
+                darkTheme = preferencesState.darkMode,
+                dynamicColor = preferencesState.dynamicColors
             ) {
                 Scaffold(
                     topBar = {
-                        if (!uiState.isFirstTime && uiState.user != null) {
+                        if (!isFirstTime && authState.user != null) {
                             TopAppBar(
                                 title = { Text("VecinApp") },
                                 navigationIcon = {
@@ -68,23 +74,25 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     bottomBar = {
-                        if ((uiState.isSenior == false) && !uiState.isFirstTime && uiState.user != null) {
-                            BottomNavigationBar(navController, uiState.user)
+                        if (!preferencesState.seniorMode && !isFirstTime && authState.user != null) {
+                            BottomNavigationBar(navController, authState.user)
                         }
                     }
                 ) { inner ->
                     Box(modifier = Modifier.padding(inner)) {
-                        // Pasamos el MainViewModel directamente al NavHost
                         VecinalNavHost(
                             navController = navController,
-                            mainViewModel = viewModel,
-                            onLoggedOut = {
-                                navController.popBackStack(ScreenLogin, inclusive = false)
-                            }
+
                         )
                     }
                 }
             }
         }
     }
+}
+
+
+@HiltAndroidApp
+class VecinAppApplication : Application() {
+    // Aquí puedes inicializar módulos globales si los necesitas
 }

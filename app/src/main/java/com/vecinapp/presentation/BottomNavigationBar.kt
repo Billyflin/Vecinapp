@@ -63,16 +63,16 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.google.firebase.auth.FirebaseUser
 import com.vecinapp.ScreenAnuncios
 import com.vecinapp.ScreenDashboard
 import com.vecinapp.ScreenEventos
 import com.vecinapp.ScreenSettings
 import com.vecinapp.ScreenSugerencias
+import com.vecinapp.domain.model.User
 import kotlinx.coroutines.delay
 
 @Composable
-fun BottomNavigationBar(navController: NavHostController, user: FirebaseUser?) {
+fun BottomNavigationBar(navController: NavHostController, user: User?) {
     val haptic = LocalHapticFeedback.current
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()

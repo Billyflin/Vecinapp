@@ -23,7 +23,6 @@ class UserPreferencesManager @Inject constructor(
     private val DARK_MODE = booleanPreferencesKey("dark_mode")
     private val DYNAMIC_COLORS = booleanPreferencesKey("dynamic_colors")
     private val FONT_SIZE = stringPreferencesKey("font_size")
-    private val SELECTED_COMMUNITY_ID = stringPreferencesKey("selected_community_id")
     private val SENIOR_MODE = booleanPreferencesKey("senior_mode")
 
     // Flujos para observar las preferencias
@@ -35,9 +34,6 @@ class UserPreferencesManager @Inject constructor(
 
     val fontSizeFlow: Flow<String> = context.dataStore.data
         .map { preferences -> preferences[FONT_SIZE] ?: "large" }
-
-    val selectedCommunityIdFlow: Flow<String?> = context.dataStore.data
-        .map { preferences -> preferences[SELECTED_COMMUNITY_ID] }
 
     val seniorModeFlow: Flow<Boolean> = context.dataStore.data
         .map { preferences -> preferences[SENIOR_MODE] ?: false }
@@ -69,15 +65,4 @@ class UserPreferencesManager @Inject constructor(
         }
     }
 
-    suspend fun setSelectedCommunityId(communityId: String) {
-        context.dataStore.edit { preferences ->
-            preferences[SELECTED_COMMUNITY_ID] = communityId
-        }
-    }
-
-    suspend fun clearUserSession() {
-        context.dataStore.edit { preferences ->
-            preferences.remove(SELECTED_COMMUNITY_ID)
-        }
-    }
 }
