@@ -15,3 +15,5 @@
 local.properties
 /.idea/appInsightsSettings.xml
 /.kotlin/errors/errors-1746455924526.log
+/.kotlin/
+/.idea/
