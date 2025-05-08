@@ -73,6 +73,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -96,12 +97,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.net.toUri
+import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.vecinapp.data.repository.AuthRepository
+import com.vecinapp.ui.viewmodel.ProfileViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
@@ -118,9 +121,7 @@ import kotlin.math.sqrt
 @Composable
 fun ProfileCompletionScreen(
     onComplete: () -> Unit,
-    authManager: AuthRepository,
-    onSeniorChange: suspend (Boolean) -> Unit,
-    onFirstTimeChange: suspend (Boolean) -> Unit
+    viewModel: ProfileViewModel = hiltViewModel()
 ) {
     // Constantes
     val TOTAL_STEPS = 5
@@ -133,7 +134,10 @@ fun ProfileCompletionScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val snackbarHostState = remember { SnackbarHostState() }
-    val user = authManager.getCurrentUser()
+
+    // Observar el estado del perfil desde el ViewModel
+    val profileState by viewModel.profileState.collectAsState()
+    val user by viewModel.currentUser.collectAsState(initial = null)
 
     // Estados del perfil
     var displayName by remember { mutableStateOf(user?.displayName ?: "") }
@@ -163,11 +167,25 @@ fun ProfileCompletionScreen(
         age = ageSliderPosition.toInt()
     }
 
-    // Cargar datos del perfil si están disponibles
-    LaunchedEffect(user) {
-        user?.let { currentUser ->
-            try {
-                val profile = authManager.getUserProfile(currentUser.uid)
+    // Observar cambios en el estado del perfil
+    LaunchedEffect(profileState) {
+        when (profileState) {
+            is ProfileViewModel.ProfileState.Loading -> {
+                isLoading = true
+            }
+            is ProfileViewModel.ProfileState.Success -> {
+                isLoading = false
+                onSeniorChange(isSenior)
+                onFirstTimeChange(false)
+                onComplete()
+            }
+            is ProfileViewModel.ProfileState.Error -> {
+                isLoading = false
+                val errorMessage = (profileState as ProfileViewModel.ProfileState.Error).message
+                snackbarHostState.showSnackbar(errorMessage)
+            }
+            is ProfileViewModel.ProfileState.UserProfile -> {
+                val profile = (profileState as ProfileViewModel.ProfileState.UserProfile).profile
                 profile.location?.let { location = it }
                 profile.latitude?.let { latitude = it }
                 profile.longitude?.let { longitude = it }
@@ -175,9 +193,18 @@ fun ProfileCompletionScreen(
                     age = it
                     ageSliderPosition = it.toFloat()
                 }
-            } catch (e: Exception) {
-                snackbarHostState.showSnackbar("Error al cargar perfil: ${e.message}")
+                profile.photoUrl?.let { photoUri = it }
             }
+            else -> {
+                isLoading = false
+            }
+        }
+    }
+
+    // Cargar datos del perfil si están disponibles
+    LaunchedEffect(user) {
+        user?.let { currentUser ->
+            viewModel.getUserProfile(currentUser.uid)
         }
     }
 
@@ -190,41 +217,16 @@ fun ProfileCompletionScreen(
             return
         }
 
-        isLoading = true
-
-        scope.launch {
-            try {
-                // Subir foto si es nueva
-                var finalPhotoUri: Uri? = photoUri
-                if (photoUri != null && !photoUri.toString().startsWith("http")) {
-                    authManager.uploadProfilePhoto(photoUri!!)
-                        .onSuccess { url -> finalPhotoUri = url }
-                        .onFailure { throw it }
-                }
-
-                // Actualizar perfil con coordenadas
-                authManager.updateUserProfile(
-                    userId = currentUser.uid,
-                    displayName = displayName,
-                    photoUri = finalPhotoUri,
-                    age = age,
-                    location = location,
-                    latitude = latitude,
-                    longitude = longitude,
-                    isComplete = true
-                ).onSuccess {
-                    isLoading = false
-                    onSeniorChange(isSenior)
-                    onFirstTimeChange(false)
-                    onComplete()
-                }.onFailure {
-                    throw it
-                }
-            } catch (e: Exception) {
-                isLoading = false
-                snackbarHostState.showSnackbar("Error al guardar perfil: ${e.message}")
-            }
-        }
+        viewModel.updateUserProfile(
+            userId = currentUser.uid,
+            displayName = displayName,
+            photoUri = photoUri,
+            age = age,
+            location = location,
+            latitude = latitude,
+            longitude = longitude,
+            isComplete = true
+        )
     }
 
     // Función para navegar al siguiente paso con validación
@@ -355,7 +357,7 @@ fun ProfileCompletionScreen(
                             isDetecting = isLocationDetecting,
                             onNext = { navigateToNextStep() },
                             onBack = { navigateToPreviousStep() },
-                            authManager = authManager,
+                            viewModel = viewModel,
                             locationTimeout = LOCATION_TIMEOUT
                         )
                     }
@@ -839,7 +841,6 @@ fun AgeStep(
         NavigationButtons(onBack = onBack, onNext = onNext)
     }
 }
-
 @Composable
 fun LocationStep(
     location: String,
@@ -851,7 +852,7 @@ fun LocationStep(
     isDetecting: Boolean,
     onNext: () -> Unit,
     onBack: () -> Unit,
-    authManager: AuthRepository,
+    viewModel: ProfileViewModel,
     locationTimeout: Long = 10000L
 ) {
     val context = LocalContext.current
@@ -868,6 +869,32 @@ fun LocationStep(
         )
     }
 
+    // Observar el estado de la ubicación
+    val locationState by viewModel.locationState.collectAsState()
+
+    // Efecto para manejar cambios en el estado de la ubicación
+    LaunchedEffect(locationState) {
+        when (locationState) {
+            is ProfileViewModel.LocationState.Loading -> {
+                localIsDetecting = true
+                errorMessage = null
+            }
+            is ProfileViewModel.LocationState.Success -> {
+                val state = locationState as ProfileViewModel.LocationState.Success
+                onLocationChange(state.cityName)
+                onCoordinatesChange(state.latitude, state.longitude)
+                localIsDetecting = false
+            }
+            is ProfileViewModel.LocationState.Error -> {
+                errorMessage = (locationState as ProfileViewModel.LocationState.Error).message
+                localIsDetecting = false
+            }
+            else -> {
+                localIsDetecting = false
+            }
+        }
+    }
+
     LaunchedEffect(isDetecting) {
         if (!isDetecting) localIsDetecting = false
     }
@@ -876,17 +903,8 @@ fun LocationStep(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
         if (permissions.entries.all { it.value }) {
-            detectCurrentLocation(
-                context = context,
-                scope = scope,
-                locationTimeout = locationTimeout,
-                onCoordinatesChange = onCoordinatesChange,
-                onLocationChange = onLocationChange,
-                authManager = authManager,
-                onError = { errorMessage = it },
-                onStart = { localIsDetecting = true; errorMessage = null; onDetectLocation() },
-                onFinish = { localIsDetecting = false }
-            )
+            onDetectLocation()
+            viewModel.detectCurrentLocation(context)
         } else {
             errorMessage = "Se requieren permisos de ubicación para detectar tu ciudad automáticamente"
             localIsDetecting = false
@@ -910,17 +928,8 @@ fun LocationStep(
                             )
                         )
                     } else {
-                        detectCurrentLocation(
-                            context = context,
-                            scope = scope,
-                            locationTimeout = locationTimeout,
-                            onCoordinatesChange = onCoordinatesChange,
-                            onLocationChange = onLocationChange,
-                            authManager = authManager,
-                            onError = { errorMessage = it },
-                            onStart = { localIsDetecting = true; errorMessage = null; onDetectLocation() },
-                            onFinish = { localIsDetecting = false }
-                        )
+                        onDetectLocation()
+                        viewModel.detectCurrentLocation(context)
                     }
                 }
             },
@@ -983,7 +992,6 @@ fun LocationStep(
         )
     }
 }
-
 private fun hasLocationPermission(context: Context): Boolean =
     ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
             ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
