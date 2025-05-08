@@ -39,7 +39,7 @@ fun DashboardScreen(
                 title = { Text("Vecinapp") },
                 actions = {
                     IconButton(onClick = onLogout) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Salir")
+                        Icon(Icons.Default.Event, contentDescription = "Salir")
                     }
                 }
             )

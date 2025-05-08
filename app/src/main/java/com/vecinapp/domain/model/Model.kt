@@ -10,7 +10,7 @@ import kotlinx.serialization.Serializable
  * Roles que pueden tener los usuarios dentro de la directiva de una comunidad.
  */
 @Serializable
-enum class Role { ADMIN, MODERATOR, MEMBER }
+enum class Role { ADMIN, MODERATOR, MEMBER, DIRECTIVE }
 
 /**
  * Estados genéricos (p.ej. para MembershipRequest o Report).

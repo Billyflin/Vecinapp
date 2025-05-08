@@ -1,6 +1,9 @@
 package com.vecinapp
 
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Button
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -14,11 +17,13 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
 import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
-import com.vecinapp.ui.screen.*
-import kotlinx.coroutines.launch
+import com.vecinapp.ui.screen.LoginScreen
+import com.vecinapp.ui.screen.OtpVerificationScreen
+import com.vecinapp.ui.screen.ProfileCompletionScreen
+import com.vecinapp.ui.screen.RegisterScreenMobile
+import com.vecinapp.ui.screen.SettingsScreen
 
 @Composable
 fun VecinalNavHost(
@@ -30,30 +35,49 @@ fun VecinalNavHost(
     val authManager = remember { AuthManager(context) }          // singleton en Composable
     val prefs = remember { PreferencesManager(context) }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+
 
     /* ────── 2.  Observar usuario actual ────── */
     val user by authManager.currentUser.collectAsState(null)
 
+
+    /* profile se observa solo cuando hay uid */
+    val profile by user?.uid?.let { uid ->
+        authManager.profile(uid).collectAsState(null)
+    } ?: remember { mutableStateOf(null) }
+
+    val start = remember(user, profile) {
+        when {
+            user == null -> ScreenLogin
+            !authManager.isPhoneLinked() -> ScreenRegisterPhone
+            profile?.isProfileComplete != true -> ScreenProfileCompletion
+            else -> ScreenDashboard
+        }
+    }
+
     /* ────── 3.  Router ────── */
     NavHost(
-        navController = navController, startDestination = when {
-            user == null -> ScreenLogin
-            else -> ScreenDashboard
-        },
+        navController = navController, startDestination = start,
 
         modifier = Modifier.fillMaxSize()
     ) {
 
         composable<ScreenLogin> {
-            LoginScreen(authManager = authManager, onSignInSuccess = {
-                navController.navigate(ScreenDashboard) {
-                    popUpTo(ScreenLogin) { inclusive = true }
-                }
-            }, onProfileIncomplete = {
-                navController.navigate(ScreenProfileCompletion) {
-                    popUpTo(ScreenLogin) { inclusive = true }
-                }
-            })
+            LoginScreen(
+                authManager = authManager,
+                snackbarHostState = snackbarHostState,
+                onSignInSuccess = {
+                    navController.navigate(ScreenDashboard) {
+                        popUpTo(ScreenLogin) { inclusive = true }
+                    }
+                },
+                onProfileIncomplete = {
+                    navController.navigate(ScreenProfileCompletion) {
+                        popUpTo(ScreenLogin) { inclusive = true }
+                    }
+                },
+            )
         }
 
         composable<ScreenRegisterPhone> {
@@ -102,25 +126,31 @@ fun VecinalNavHost(
         /* Completar datos de perfil tras OTP */
         composable<ScreenProfileCompletion> {
             ProfileCompletionScreen(
-                authManager = authManager,
-                onComplete = {
+                authManager = authManager, onComplete = {
                     navController.navigate(ScreenDashboard) {
                         popUpTo(ScreenRegisterPhone) { inclusive = true }
                     }
                 })
         }
 
+        composable<ScreenDashboard> {
+            Text(text = "Dashboard")
+            Button(onClick = {
+                authManager.signOut()
+                navController.navigate(ScreenLogin) {
+                    popUpTo(ScreenDashboard) { inclusive = true }
+                }
+            }) {
 
-        /* Anuncios */
-        composable<ScreenAnuncios> {
-            AnunciosScreen()
+            }
         }
 
 
-        /* Sugerencias, Tablón y Panel Directivo */
-        composable<ScreenSugerencias> { SugerenciasListScreen() }
-        composable<ScreenTablon> { TablonListScreen() }
-        composable<ScreenPanel> { PanelDirectivoScreen() }
+        /* Anuncios */
+        composable<ScreenAnuncios> {
+//            AnunciosScreen()
+        }
+
 
         /* Ajustes */
         composable<ScreenSettings> {
@@ -128,7 +158,5 @@ fun VecinalNavHost(
                 prefs = prefs, onBack = { navController.popBackStack() })
         }
     }
-
-    // You can use this showNavBar boolean to control the visibility of your navbar
-    // in your main activity or wherever your navbar is defined
 }
+

@@ -2,7 +2,6 @@
 package com.vecinapp.ui.screen
 
 import android.app.Activity
-import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult
 import androidx.compose.animation.AnimatedVisibility
@@ -18,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
@@ -28,8 +28,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,67 +45,52 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.identity.Identity
-import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.R
 import com.vecinapp.auth.AuthManager
 import com.vecinapp.presentation.GoogleSignInButton
 import kotlinx.coroutines.launch
 
-private sealed class LoginStep {
-    data object Choice : LoginStep()
-    data object PhoneInput : LoginStep()
-    data class Otp(val verificationId: String, val token: PhoneAuthProvider.ForceResendingToken) :
-        LoginStep()
-}
-
 @Composable
 fun LoginScreen(
     onSignInSuccess: () -> Unit,
     onProfileIncomplete: () -> Unit,
-    authManager: AuthManager
+    authManager: AuthManager,
+    snackbarHostState: SnackbarHostState
 ) {
-    var step by remember { mutableStateOf<LoginStep>(LoginStep.Choice) }
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
 
-
-    val launcher = rememberLauncherForActivityResult(StartIntentSenderForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            runCatching {
-                val cred =
-                    Identity.getSignInClient(context).getSignInCredentialFromIntent(result.data)
-                cred.googleIdToken?.let { idToken ->
-                    isLoading = true
-                    scope.launch {
-                        authManager.firebaseAuthWithGoogle(idToken)
-                            .onSuccess { user ->
-                                if (authManager.isProfileComplete(user.uid)) {
-                                    isLoading = false
-                                    onSignInSuccess()
-                                } else {
-                                    isLoading = false
-                                    onProfileIncomplete()
-                                }
-                            }
-                            .onFailure { e ->
-                                isLoading = false
-                                snackbarHostState.showSnackbar("Error: ${e.message}")
-                                Log.e("Auth", "Google auth error: ${e.message}")
-                            }
-                    }
+    /* ----- token handler ----- */
+    fun handleToken(idToken: String) {
+        isLoading = true
+        scope.launch {
+            authManager.firebaseAuthWithGoogle(idToken)
+                .onSuccess { user ->
+                    isLoading = false
+                    if (authManager.isProfileComplete(user.uid)) onSignInSuccess()
+                    else onProfileIncomplete()
                 }
-            }.onFailure {
-                isLoading = false
-                scope.launch {
-                    snackbarHostState.showSnackbar("Error: ${it.message}")
+                .onFailure { e ->
+                    isLoading = false
+                    snackbarHostState.showSnackbar("Error: ${e.message}")
                 }
-                Log.e("Auth", "One-Tap error: ${it.localizedMessage}")
-            }
         }
     }
 
+    /* ----- One-Tap launcher ----- */
+    val launcher =
+        rememberLauncherForActivityResult(StartIntentSenderForResult()) { r ->
+            if (r.resultCode == Activity.RESULT_OK) {
+                val idToken = Identity
+                    .getSignInClient(context)
+                    .getSignInCredentialFromIntent(r.data)
+                    .googleIdToken
+                idToken?.let(::handleToken)
+            }
+        }
+
+    /* ---------------- UI ---------------- */
     Box(
         Modifier
             .fillMaxSize()
@@ -121,162 +104,99 @@ fun LoginScreen(
             ),
         contentAlignment = Alignment.Center
     ) {
-        when (val s = step) {
-            is LoginStep.Choice -> Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.icon_text),
-                    contentDescription = "Logo",
-                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
-                    modifier = Modifier.padding(16.dp)
-                )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(24.dp)
+        ) {
+            Image(
+                painter = painterResource(R.drawable.icon_text),
+                contentDescription = "Logo",
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
+                modifier = Modifier.padding(16.dp)
+            )
 
-                Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp))
 
-                Text(
-                    "Bienvenido a VecinApp",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    fontWeight = FontWeight.Bold
-                )
+            Text(
+                "Bienvenido a VecinApp",
+                style = MaterialTheme.typography.headlineMedium,
+                color = MaterialTheme.colorScheme.onPrimary,
+                fontWeight = FontWeight.Bold
+            )
 
-                Text(
-                    "Conecta con tu comunidad",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(bottom = 32.dp)
-                )
+            Text(
+                "Conecta con tu comunidad",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
+                modifier = Modifier.padding(bottom = 32.dp)
+            )
 
-                GoogleSignInButton(
-                    onClick = {
+            /* ----- Google One-Tap ----- */
+            GoogleSignInButton(
+                onClick = {
+                    scope.launch {
                         isLoading = true
-                        authManager.beginGoogleSignIn(
-                            onSuccess = { intentSenderRequest ->
-                                isLoading = false
-                                launcher.launch(intentSenderRequest)
-                            },
-                            onFailure = { e ->
-                                isLoading = false
-                                scope.launch {
-                                    snackbarHostState.showSnackbar("Error: ${e.message}")
-                                }
-                                Log.e("Auth", "One-Tap failed: ${e.localizedMessage}")
+                        authManager.getGoogleOneTapIntent()
+                            .onSuccess { launcher.launch(it) }
+                            .onFailure { e ->
+                                snackbarHostState.showSnackbar("Error: ${e.message}")
                             }
-                        )
+                        isLoading = false
                     }
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                // SMS Sign In
-                OutlinedButton(
-                    onClick = { step = LoginStep.PhoneInput },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.Default.Call,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.padding(horizontal = 8.dp))
-                    Text("Ingresar con SMS")
                 }
+            )
 
-                Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-                // Anonymous Sign In
-                Button(
-                    onClick = {
-                        isLoading = true
-                        scope.launch {
-                            authManager.signInAnonymously()
-                                .onSuccess {
-                                    isLoading = false
-                                    onSignInSuccess()
-                                }
-                                .onFailure { e ->
-                                    isLoading = false
-                                    snackbarHostState.showSnackbar("Error: ${e.message}")
-                                    Log.e("Auth", "Anonymous auth error: ${e.message}")
-                                }
-                        }
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.onPrimary,
-                        contentColor = MaterialTheme.colorScheme.primary
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.padding(horizontal = 8.dp))
-                    Text("Ingresar como Invitado", fontWeight = FontWeight.Medium)
-                }
+            /* ----- SMS ----- */
+            OutlinedButton(
+                onClick = { /* navegar a flujo SMS */ },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.onPrimary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Call, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Ingresar con SMS")
             }
 
-            is LoginStep.PhoneInput -> {
-                RegisterScreenMobile(
-                    authManager = authManager,
-                    forceResendingToken = null,
-                    onVerificationSent = { verificationId, token ->
-                        step = LoginStep.Otp(verificationId, token)
-                    },
-                    onError = { errorMessage ->
-                        scope.launch {
-                            snackbarHostState.showSnackbar(errorMessage)
-                        }
-                    },
-                    onCancel = {
-                        step = LoginStep.Choice
-                    }
-                )
-            }
+            Spacer(Modifier.height(16.dp))
 
-            // OTP Verification Step
-            is LoginStep.Otp -> {
-                OtpVerificationScreen(
-                    authManager = authManager,
-                    verificationId = s.verificationId,
-                    forceResendingToken = s.token,
-                    onVerified = {
-                        // Successfully authenticated with SMS
-                        onSignInSuccess()
-                    },
-                    onResend = {
-                        // Go back to phone input with the same token
-                        step = LoginStep.PhoneInput
-                    },
-                    onError = { errorMessage ->
-                        scope.launch {
-                            snackbarHostState.showSnackbar(errorMessage)
-                        }
-                    },
-                    onCancel = {
-                        step = LoginStep.Choice
+            /* ----- Invitado ----- */
+            Button(
+                onClick = {
+                    isLoading = true
+                    scope.launch {
+                        authManager.signInAnonymously()
+                            .onSuccess {
+                                isLoading = false
+                                onSignInSuccess()
+                            }
+                            .onFailure { e ->
+                                isLoading = false
+                                snackbarHostState.showSnackbar("Error: ${e.message}")
+                            }
                     }
-                )
+                },
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.onPrimary,
+                    contentColor = MaterialTheme.colorScheme.primary
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text("Ingresar como Invitado", fontWeight = FontWeight.Medium)
             }
         }
 
-        // Loading indicator
-        AnimatedVisibility(
-            visible = isLoading,
-            enter = fadeIn(),
-            exit = fadeOut()
-        ) {
+        /* ----- Loading overlay ----- */
+        AnimatedVisibility(isLoading, enter = fadeIn(), exit = fadeOut()) {
             Box(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
                     .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f)),
                 contentAlignment = Alignment.Center
@@ -286,20 +206,6 @@ fun LoginScreen(
                     modifier = Modifier.size(48.dp)
                 )
             }
-        }
-
-        // Snackbar for errors
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
-        ) { data ->
-            Snackbar(
-                containerColor = MaterialTheme.colorScheme.errorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                snackbarData = data
-            )
         }
     }
 }

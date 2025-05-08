@@ -37,6 +37,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Check
@@ -360,8 +362,6 @@ fun ProfileCompletionScreen(
                                     onSuccess = {
                                         // Save senior mode preference and mark first time as false
                                         scope.launch {
-                                            onSeniorChange(isSenior)
-                                            onFirstTimeChange(false)
                                             onComplete()
                                         }
                                     }

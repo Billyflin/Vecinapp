@@ -23,11 +23,11 @@ import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
 
-    private val prefs = PreferencesManager(applicationContext)
-    private val initial = runBlocking { prefs.preferencesFlow.first() }
-    private val authManager = AuthManager(applicationContext)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = PreferencesManager(applicationContext)
+        val initial = runBlocking { prefs.preferencesFlow.first() }
+        val authManager = AuthManager(applicationContext)
         enableEdgeToEdge()
         setContent {
             var dynamicColor by remember { mutableStateOf(initial.dynamicColor) }
