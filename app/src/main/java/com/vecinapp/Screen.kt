@@ -14,6 +14,9 @@ interface Screen {
 object ScreenLogin : Screen
 
 @Serializable
+object ScreenSplash : Screen
+
+@Serializable
 object ScreenRegisterPhone : Screen
 
 @Serializable

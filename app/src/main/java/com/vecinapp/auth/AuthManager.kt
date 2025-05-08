@@ -24,7 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -97,20 +96,10 @@ class AuthManager(private val context: Context) {
         auth.removeAuthStateListener(listener)
     }
 
-    // AuthManager.kt
-    suspend fun getGoogleOneTapIntent(): Result<IntentSenderRequest> =
-        suspendCancellableCoroutine { cont ->
-            oneTapClient.beginSignIn(getGoogleSignInRequest())
-                .addOnSuccessListener { result ->
-                    val req = IntentSenderRequest
-                        .Builder(result.pendingIntent.intentSender)
-                        .build()
-                    cont.resume(Result.success(req)) { cause, _, _ -> null(cause) }
-                }
-                .addOnFailureListener { e ->
-                    cont.resume(Result.failure(e)) { cause, _, _ -> null(cause) }
-                }
-        }
+    suspend fun getGoogleOneTapIntent(): Result<IntentSenderRequest> = runCatching {
+        val result = oneTapClient.beginSignIn(getGoogleSignInRequest()).await()
+        IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
+    }
 
 
     /**
@@ -287,7 +276,8 @@ class AuthManager(private val context: Context) {
         val location: String? = null,
         val latitude: Double? = null,
         val longitude: Double? = null,
-        val isProfileComplete: Boolean = false
+        val isProfileComplete: Boolean = false,
+        val isSenior: Boolean = false
     )
 
     /**
@@ -301,11 +291,7 @@ class AuthManager(private val context: Context) {
 
             // Define what constitutes a "complete" profile
             // For example, we require displayName, age, and location
-            return userProfile.displayName != null &&
-                    userProfile.age != null &&
-                    userProfile.location != null &&
-                    userProfile.latitude != null &&
-                    userProfile.longitude != null
+            return userProfile.isProfileComplete
         } catch (e: Exception) {
             Log.e(TAG, "Error checking profile completeness: ${e.message}")
             return false
@@ -333,6 +319,7 @@ class AuthManager(private val context: Context) {
                 val location = userDoc.getString("location")
                 val latitude = userDoc.getDouble("latitude")
                 val longitude = userDoc.getDouble("longitude")
+                val isSenior = userDoc.getBoolean("isSenior") ?: false
                 val isComplete = userDoc.getBoolean("isProfileComplete") ?: false
 
                 UserProfile(
@@ -342,19 +329,21 @@ class AuthManager(private val context: Context) {
                     location = location,
                     latitude = latitude,
                     longitude = longitude,
-                    isProfileComplete = isComplete
+                    isProfileComplete = isComplete,
+                    isSenior = isSenior
                 )
             } else {
                 // User doesn't have a profile document yet
                 UserProfile(
                     displayName = authUser?.displayName,
                     photoUrl = authUser?.photoUrl?.toString(),
-                    isProfileComplete = false
+                    isProfileComplete = false,
+                    isSenior = false
                 )
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error getting user profile: ${e.message}")
-            UserProfile(isProfileComplete = false)
+            UserProfile(isProfileComplete = false, isSenior = false)
         }
     }
 
@@ -364,78 +353,66 @@ class AuthManager(private val context: Context) {
     suspend fun updateUserProfile(
         userId: String,
         displayName: String? = null,
-        photoUri: Uri? = null,
+        photoUri: Uri? = null,      // pública; se usará en Auth y Firestore
         age: Int? = null,
         location: String? = null,
         latitude: Double? = null,
         longitude: Double? = null,
-        isComplete: Boolean = false
-    ): Result<UserProfile> {
-        return try {
-            val user = getCurrentUser() ?: throw Exception("No user is currently signed in")
+        isProfileComplete: Boolean = false,
+        isSenior: Boolean = false
+    ): Result<UserProfile> = runCatching {
+        val user = getCurrentUser() ?: error("No user signed in")
 
-            // Update Firebase Auth profile if name or photo changed
-            if (displayName != null || photoUri != null) {
-                val profileUpdates = UserProfileChangeRequest.Builder().apply {
-                    displayName?.let { setDisplayName(it) }
-                    photoUri?.let { setPhotoUri(it) }
-                }.build()
-
-                user.updateProfile(profileUpdates).await()
-            }
-
-            // Prepare data for Firestore
-            val profileData = mutableMapOf<String, Any>()
-            age?.let { profileData["age"] = it }
-            location?.let { profileData["location"] = it }
-            latitude?.let { profileData["latitude"] = it }
-            longitude?.let { profileData["longitude"] = it }
-            profileData["isProfileComplete"] = isComplete
-            profileData["updatedAt"] = FieldValue.serverTimestamp()
-
-            // Update Firestore document
-            FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(userId)
-                .set(profileData, SetOptions.merge())
-                .await()
-
-            // Return updated profile
-            val updatedProfile = UserProfile(
-                displayName = user.displayName,
-                photoUrl = user.photoUrl?.toString(),
-                age = age,
-                location = location,
-                latitude = latitude,
-                longitude = longitude,
-                isProfileComplete = isComplete
-            )
-
-            Result.success(updatedProfile)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating user profile: ${e.message}")
-            Result.failure(e)
+        /* ---------- 1. Firebase Auth ---------- */
+        if (displayName != null || photoUri != null) {
+            val req = UserProfileChangeRequest.Builder().apply {
+                displayName?.let(::setDisplayName)
+                photoUri?.let(::setPhotoUri)          // <- guarda en Auth
+            }.build()
+            user.updateProfile(req).await()
         }
+
+        /* ---------- 2. Firestore -------------- */
+        val data = mutableMapOf<String, Any>(
+            "isProfileComplete" to isProfileComplete,
+            "isSenior" to isSenior,
+            "updatedAt" to FieldValue.serverTimestamp()
+        )
+        age?.let { data["age"] = it }
+        location?.let { data["location"] = it }
+        latitude?.let { data["latitude"] = it }
+        longitude?.let { data["longitude"] = it }
+        photoUri?.let { data["photoUrl"] = it.toString() }   // <- NUEVO
+
+        FirebaseFirestore.getInstance()
+            .collection("users").document(userId)
+            .set(data, SetOptions.merge()).await()
+
+        /* ---------- 3. Objeto de retorno ------- */
+        UserProfile(
+            displayName = user.displayName,
+            photoUrl = photoUri?.toString(),
+            age = age,
+            location = location,
+            latitude = latitude,
+            longitude = longitude,
+            isProfileComplete = isProfileComplete,
+            isSenior = isSenior
+        )
     }
+
 
     /**
      * Upload profile photo and return the download URL
      */
-    suspend fun uploadProfilePhoto(photoUri: Uri): Result<Uri> {
-        return try {
-            val user = getCurrentUser() ?: throw Exception("No user is currently signed in")
-            val storageRef = FirebaseStorage.getInstance().reference
-            val photoRef = storageRef.child("profile_photos/${user.uid}/${UUID.randomUUID()}")
-
-            val uploadTask = photoRef.putFile(photoUri).await()
-            val downloadUrl = photoRef.downloadUrl.await()
-
-            Result.success(downloadUrl)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error uploading profile photo: ${e.message}")
-            Result.failure(e)
-        }
+    suspend fun uploadProfilePhoto(photoUri: Uri): Result<Uri> = runCatching {
+        val user = getCurrentUser() ?: error("No user")
+        val ref = FirebaseStorage.getInstance()
+            .reference.child("profile_photos/${user.uid}/${UUID.randomUUID()}")
+        ref.putFile(photoUri).await()
+        ref.downloadUrl.await()                     // <- URL pública
     }
+
 
     /**
      * Get only the city name from latitude and longitude

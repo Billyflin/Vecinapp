@@ -55,7 +55,8 @@ fun LoginScreen(
     onSignInSuccess: () -> Unit,
     onProfileIncomplete: () -> Unit,
     authManager: AuthManager,
-    snackbarHostState: SnackbarHostState
+    snackbarHostState: SnackbarHostState,
+    onSmsVerification: () -> Unit
 ) {
     var isLoading by remember { mutableStateOf(false) }
     val context = LocalContext.current
@@ -150,7 +151,7 @@ fun LoginScreen(
 
             /* ----- SMS ----- */
             OutlinedButton(
-                onClick = { /* navegar a flujo SMS */ },
+                onClick = onSmsVerification,
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.onPrimary

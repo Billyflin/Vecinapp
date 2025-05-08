@@ -1,5 +1,6 @@
 package com.vecinapp
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Button
 import androidx.compose.material3.SnackbarHostState
@@ -8,9 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
@@ -28,47 +30,46 @@ import com.vecinapp.ui.screen.SettingsScreen
 @Composable
 fun VecinalNavHost(
     navController: NavHostController = rememberNavController()
-) {
-
-    /* ────── 1.  Crear dependencias UNA sola vez ────── */
+) {/* 1.  dependencias una sola vez */
     val context = LocalContext.current
-    val authManager = remember { AuthManager(context) }          // singleton en Composable
+    val authManager = remember { AuthManager(context) }
     val prefs = remember { PreferencesManager(context) }
-    val scope = rememberCoroutineScope()
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbar = remember { SnackbarHostState() }
 
-
-    /* ────── 2.  Observar usuario actual ────── */
-    val user by authManager.currentUser.collectAsState(null)
-
-
-    /* profile se observa solo cuando hay uid */
-    val profile by user?.uid?.let { uid ->
-        authManager.profile(uid).collectAsState(null)
-    } ?: remember { mutableStateOf(null) }
-
-    val start = remember(user, profile) {
-        when {
+    /* 2.  cálculo FINITO del destino -------------------- */
+    val start by produceState<Screen>(
+        initialValue = ScreenSplash,
+        key1 = authManager.currentUser.collectAsState(null).value?.uid // ← key
+    ) {
+        val user = authManager.getCurrentUser()
+        value = when {
             user == null -> ScreenLogin
-            !authManager.isPhoneLinked() -> ScreenRegisterPhone
-            profile?.isProfileComplete != true -> ScreenProfileCompletion
-            else -> ScreenDashboard
+//            user.phoneNumber == null -> ScreenRegisterPhone
+            else -> {
+                val profile = authManager.getUserProfile(user.uid)
+                if (!profile.isProfileComplete) ScreenProfileCompletion
+                else ScreenDashboard
+            }
         }
     }
 
-    /* ────── 3.  Router ────── */
-    NavHost(
-        navController = navController, startDestination = start,
 
-        modifier = Modifier.fillMaxSize()
+    /* 3.  NavHost fijo ---------------------------------- */
+    NavHost(
+        navController = navController, startDestination = start, modifier = Modifier.fillMaxSize()
     ) {
 
+        composable<ScreenSplash> {
+            ScreenSplash()
+        }
+
+        /* ------------------ Login ------------------ */
         composable<ScreenLogin> {
             LoginScreen(
                 authManager = authManager,
-                snackbarHostState = snackbarHostState,
+                snackbarHostState = snackbar,
                 onSignInSuccess = {
-                    navController.navigate(ScreenDashboard) {
+                    navController.navigate(start) {
                         popUpTo(ScreenLogin) { inclusive = true }
                     }
                 },
@@ -77,9 +78,13 @@ fun VecinalNavHost(
                         popUpTo(ScreenLogin) { inclusive = true }
                     }
                 },
+                onSmsVerification = {
+                    navController.navigate(ScreenRegisterPhone)
+                }
             )
         }
 
+        /* -------------- Registro teléfono ---------- */
         composable<ScreenRegisterPhone> {
             var verificationId by remember { mutableStateOf<String?>(null) }
             var resendToken by remember {
@@ -123,18 +128,19 @@ fun VecinalNavHost(
             }
         }
 
-        /* Completar datos de perfil tras OTP */
+        /* -------------- Completar perfil ----------- */
         composable<ScreenProfileCompletion> {
             ProfileCompletionScreen(
                 authManager = authManager, onComplete = {
                     navController.navigate(ScreenDashboard) {
-                        popUpTo(ScreenRegisterPhone) { inclusive = true }
+                        popUpTo(ScreenProfileCompletion) { inclusive = true }
                     }
                 })
         }
 
+        /* ---------------- Dashboard ---------------- */
         composable<ScreenDashboard> {
-            Text(text = "Dashboard")
+            Text("Dashboard")
             Button(onClick = {
                 authManager.signOut()
                 navController.navigate(ScreenLogin) {
@@ -145,18 +151,19 @@ fun VecinalNavHost(
             }
         }
 
-
-        /* Anuncios */
-        composable<ScreenAnuncios> {
-//            AnunciosScreen()
-        }
-
-
-        /* Ajustes */
+        /* ----------- demás pantallas --------------- */
         composable<ScreenSettings> {
-            SettingsScreen(
-                prefs = prefs, onBack = { navController.popBackStack() })
+            SettingsScreen(prefs) { navController.popBackStack() }
         }
     }
 }
 
+/* Pantalla de espera muy simple */
+@Composable
+private fun ScreenSplash() {
+    Box(
+        Modifier.fillMaxSize(), contentAlignment = Alignment.Center
+    ) {
+        androidx.compose.material3.CircularProgressIndicator()
+    }
+}
