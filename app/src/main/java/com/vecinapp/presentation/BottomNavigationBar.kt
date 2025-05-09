@@ -60,13 +60,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.vecinapp.ScreenDashboard
+import com.vecinapp.ScreenHome
 import com.vecinapp.ScreenSettings
-import com.vecinapp.domain.model.User
+import com.vecinapp.auth.UserProfile
 import kotlinx.coroutines.delay
 
 @Composable
-fun BottomNavigationBar(navController: NavHostController, user: User?) {
+fun BottomNavigationBar(navController: NavHostController, user: UserProfile?) {
     val haptic = LocalHapticFeedback.current
 
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -192,7 +192,7 @@ fun BottomNavigationBar(navController: NavHostController, user: User?) {
             FloatingActionButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    navController.navigate(ScreenDashboard) {
+                    navController.navigate(ScreenHome) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

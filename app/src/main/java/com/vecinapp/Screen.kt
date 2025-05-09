@@ -23,22 +23,17 @@ object ScreenRegisterPhone : Screen
 object ScreenProfileCompletion : Screen
 
 @Serializable
-object ScreenDashboard : Screen
+object ScreenHome : Screen
 
 @Serializable
-object ScreenAnuncios : Screen
+object ScreenNotifications : Screen
+
+@Serializable
+object ScreenCommunities : Screen
+
 
 @Serializable
 object ScreenEventos : Screen
-
-@Serializable
-object ScreenSugerencias : Screen
-
-@Serializable
-object ScreenTablon : Screen
-
-@Serializable
-object ScreenPanel : Screen
 
 @Serializable
 object ScreenSettings : Screen

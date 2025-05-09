@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresPermission
@@ -48,6 +49,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -64,7 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
-import androidx.core.net.toUri
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -88,29 +89,35 @@ fun ProfileCompletionScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Current user
-    val user by remember { mutableStateOf(authManager.getCurrentUser()) }
+    val user by authManager.currentUser.collectAsState(null)
 
     // Profile data states
     var displayName by remember { mutableStateOf(user?.displayName ?: "") }
     var age by remember { mutableIntStateOf(30) } // Default to 30
     var ageSliderPosition by remember { mutableFloatStateOf(30f) }
     var location by remember { mutableStateOf("") }
-    var photoUri by remember { mutableStateOf(user?.photoUrl?.toString()) }
+    var photoUri by remember { mutableStateOf<Uri?>(user?.photoUrl) }
     var isLoading by remember { mutableStateOf(false) }
-    var currentStep by remember { mutableIntStateOf(1) } // 1: Senior Mode, 2: Name, 3: Age, 4: Location, 5: Photo
-    var isLocationDetecting by remember { mutableStateOf(false) }
+    var currentStep by rememberSaveable { mutableIntStateOf(1) } // 1: Senior Mode, 2: Name, 3: Age, 4: Location, 5: Photo
+    var isLocationDetecting by rememberSaveable { mutableStateOf(false) }
     var isSenior by rememberSaveable { mutableStateOf(false) }
 
+    LaunchedEffect(user) {
+        Log.d("ProfileCompletionScreen", "User: $user")
+        user?.let { u ->
+            if (displayName.isBlank()) displayName = u.displayName.orEmpty()
+            if (photoUri == null) photoUri = u.photoUrl
+            // aquí puedes copiar más campos si los necesitas
+        }
+    }
     // Progress tracking
     val totalSteps = 5 // Now including senior mode step
     val progress = currentStep.toFloat() / totalSteps.toFloat()
 
     // Photo picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        uri?.let { photoUri = it.toString() }
-    }
+        ActivityResultContracts.GetContent()
+    ) { uri -> photoUri = uri }
 
     // Update age when slider moves
     LaunchedEffect(ageSliderPosition) {
@@ -123,7 +130,7 @@ fun ProfileCompletionScreen(
             isLoading = true
             try {
 
-                val remoteUri: Uri? = photoUri?.toUri()?.let { localUri ->
+                val remoteUri: Uri? = photoUri?.let { localUri ->
                     authManager.uploadProfilePhoto(localUri).getOrThrow()
                 }
 

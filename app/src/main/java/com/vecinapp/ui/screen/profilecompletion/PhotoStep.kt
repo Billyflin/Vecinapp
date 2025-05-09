@@ -1,5 +1,6 @@
 package com.vecinapp.ui.screen.profilecompletion
 
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +48,7 @@ import coil.request.ImageRequest
 
 @Composable
 fun PhotoStep(
-    photoUri: String?,
+    photoUri: Uri?,
     onPickPhoto: () -> Unit,
     onNext: () -> Unit,
     onBack: () -> Unit

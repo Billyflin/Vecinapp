@@ -2,7 +2,10 @@ package com.vecinapp
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +24,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
+import com.vecinapp.auth.UserProfile
+import com.vecinapp.presentation.BottomNavigationBar
 import com.vecinapp.ui.screen.LoginScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
@@ -37,123 +42,153 @@ fun VecinalNavHost(
     val snackbar = remember { SnackbarHostState() }
 
     /* 2.  cálculo FINITO del destino -------------------- */
-    val start by produceState<Screen>(
-        initialValue = ScreenSplash,
-        key1 = authManager.currentUser.collectAsState(null).value?.uid // ← key
-    ) {
-        val user = authManager.getCurrentUser()
-        value = when {
-            user == null -> ScreenLogin
-//            user.phoneNumber == null -> ScreenRegisterPhone
-            else -> {
-                val profile = authManager.getUserProfile(user.uid)
-                if (!profile.isProfileComplete) ScreenProfileCompletion
-                else ScreenDashboard
-            }
+
+
+    val user = authManager.currentUser.collectAsState(null).value
+
+    // produceState ES suspend -> aquí sí se puede llamar a funciones suspend
+    val profile by produceState<UserProfile?>(null, user?.uid) {
+        value = user?.let { authManager.getUserProfile(it.uid) }      // 1 sola query
+    }
+
+    /* -------- 3. pantalla inicial -------- */
+    val start = remember(user, profile) {
+        when {
+            user == null -> ScreenLogin/* user.phoneNumber == null      -> ScreenRegisterPhone  // si lo necesitas */
+            profile?.isProfileComplete != true -> ScreenProfileCompletion
+            else -> ScreenHome
         }
     }
 
-
-    /* 3.  NavHost fijo ---------------------------------- */
-    NavHost(
-        navController = navController, startDestination = start, modifier = Modifier.fillMaxSize()
+    /* -------- 4. UI -------- */
+    Scaffold(
+        bottomBar = {
+            // Mostramos la bottom bar sólo cuando el perfil existe Y está completo
+            profile?.takeIf { it.isProfileComplete }?.let { p ->
+                BottomNavigationBar(
+                    navController = navController, user = p            // evita !! y es null-safe
+                )
+            }
+        },
     ) {
 
-        composable<ScreenSplash> {
-            ScreenSplash()
-        }
 
-        /* ------------------ Login ------------------ */
-        composable<ScreenLogin> {
-            LoginScreen(
-                authManager = authManager,
-                snackbarHostState = snackbar,
-                onSignInSuccess = {
-                    navController.navigate(start) {
-                        popUpTo(ScreenLogin) { inclusive = true }
-                    }
-                },
-                onProfileIncomplete = {
-                    navController.navigate(ScreenProfileCompletion) {
-                        popUpTo(ScreenLogin) { inclusive = true }
-                    }
-                },
-                onSmsVerification = {
-                    navController.navigate(ScreenRegisterPhone)
-                }
-            )
-        }
+        /* 3.  NavHost fijo ---------------------------------- */
+        NavHost(
+            navController = navController,
+            startDestination = start,
+            modifier = Modifier
+                .padding(it)
+                .fillMaxSize()
+        ) {
 
-        /* -------------- Registro teléfono ---------- */
-        composable<ScreenRegisterPhone> {
-            var verificationId by remember { mutableStateOf<String?>(null) }
-            var resendToken by remember {
-                mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null)
+            composable<ScreenSplash> {
+                ScreenSplash()
             }
-            var errorMessage by remember { mutableStateOf<String?>(null) }
 
-            if (verificationId == null) {
-                RegisterScreenMobile(
+            /* ------------------ Login ------------------ */
+            composable<ScreenLogin> {
+                LoginScreen(
                     authManager = authManager,
-                    forceResendingToken = resendToken,
-                    onVerificationSent = { id, token ->
-                        verificationId = id
-                        resendToken = token
-                    },
-                    onError = { error ->
-                        errorMessage = error
-                    },
-                    onCancel = {
-                        navController.popBackStack()
-                    })
-            } else {
-                OtpVerificationScreen(
-                    authManager = authManager,
-                    verificationId = verificationId!!,
-                    forceResendingToken = resendToken,
-                    onVerified = {
-                        navController.navigate(ScreenProfileCompletion) {
-                            popUpTo(ScreenRegisterPhone) { inclusive = true }
+                    snackbarHostState = snackbar,
+                    onSignInSuccess = {
+                        navController.navigate(start) {
+                            popUpTo(ScreenLogin) { inclusive = true }
                         }
                     },
-                    onResend = {
-                        verificationId = null
+                    onProfileIncomplete = {
+                        navController.navigate(ScreenProfileCompletion) {
+                            popUpTo(ScreenLogin) { inclusive = true }
+                        }
                     },
-                    onError = { error ->
-                        errorMessage = error
-                    },
-                    onCancel = {
-                        navController.popBackStack()
+                    onSmsVerification = {
+                        navController.navigate(ScreenRegisterPhone)
                     })
             }
-        }
 
-        /* -------------- Completar perfil ----------- */
-        composable<ScreenProfileCompletion> {
-            ProfileCompletionScreen(
-                authManager = authManager, onComplete = {
-                    navController.navigate(ScreenDashboard) {
-                        popUpTo(ScreenProfileCompletion) { inclusive = true }
-                    }
-                })
-        }
-
-        /* ---------------- Dashboard ---------------- */
-        composable<ScreenDashboard> {
-            Text("Dashboard")
-            Button(onClick = {
-                authManager.signOut()
-                navController.navigate(ScreenLogin) {
-                    popUpTo(ScreenDashboard) { inclusive = true }
+            /* -------------- Registro teléfono ---------- */
+            composable<ScreenRegisterPhone> {
+                var verificationId by remember { mutableStateOf<String?>(null) }
+                var resendToken by remember {
+                    mutableStateOf<PhoneAuthProvider.ForceResendingToken?>(null)
                 }
-            }) {
+                var errorMessage by remember { mutableStateOf<String?>(null) }
 
+                if (verificationId == null) {
+                    RegisterScreenMobile(
+                        authManager = authManager,
+                        forceResendingToken = resendToken,
+                        onVerificationSent = { id, token ->
+                            verificationId = id
+                            resendToken = token
+                        },
+                        onError = { error ->
+                            errorMessage = error
+                        },
+                        onCancel = {
+                            navController.popBackStack()
+                        })
+                } else {
+                    OtpVerificationScreen(
+                        authManager = authManager,
+                        verificationId = verificationId!!,
+                        forceResendingToken = resendToken,
+                        onVerified = {
+                            navController.navigate(ScreenProfileCompletion) {
+                                popUpTo(ScreenRegisterPhone) { inclusive = true }
+                            }
+                        },
+                        onResend = {
+                            verificationId = null
+                        },
+                        onError = { error ->
+                            errorMessage = error
+                        },
+                        onCancel = {
+                            navController.popBackStack()
+                        })
+                }
             }
-        }
 
-        /* ----------- demás pantallas --------------- */
-        composable<ScreenSettings> {
-            SettingsScreen(prefs) { navController.popBackStack() }
+            /* -------------- Completar perfil ----------- */
+            composable<ScreenProfileCompletion> {
+                ProfileCompletionScreen(
+                    authManager = authManager, onComplete = {
+                        navController.navigate(ScreenHome) {
+                            popUpTo(ScreenProfileCompletion) { inclusive = true }
+                        }
+                    })
+            }
+
+            /* ---------------- Home ---------------- */
+            composable<ScreenHome> {
+                Text("Dashboard")
+                Button(onClick = {
+                    authManager.signOut()
+                    navController.navigate(ScreenLogin) {
+                        popUpTo(ScreenHome) { inclusive = true }
+                    }
+                }) {
+
+                }
+            }
+
+            /*--------------- Notifications --------------- */
+            composable<ScreenNotifications> {
+                Text("Notifications")
+            }
+
+
+            /* -------------- Comunidades -------------- */
+            composable<ScreenCommunities> {
+                Text("Communities")
+            }
+
+
+            /* ----------- Configuraciones --------------- */
+            composable<ScreenSettings> {
+                SettingsScreen(prefs) { navController.popBackStack() }
+            }
         }
     }
 }
@@ -164,6 +199,6 @@ private fun ScreenSplash() {
     Box(
         Modifier.fillMaxSize(), contentAlignment = Alignment.Center
     ) {
-        androidx.compose.material3.CircularProgressIndicator()
+        CircularProgressIndicator()
     }
 }

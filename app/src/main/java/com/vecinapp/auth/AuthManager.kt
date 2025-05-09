@@ -1,11 +1,12 @@
+// file: com/vecinapp/auth/AuthManager.kt
 package com.vecinapp.auth
 
 import android.app.Activity
 import android.content.Context
 import android.location.Geocoder
 import android.net.Uri
-import android.util.Log
 import androidx.activity.result.IntentSenderRequest
+import androidx.core.net.toUri
 import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.firebase.auth.AuthCredential
@@ -16,144 +17,192 @@ import com.google.firebase.auth.PhoneAuthCredential
 import com.google.firebase.auth.PhoneAuthOptions
 import com.google.firebase.auth.PhoneAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.storage.FirebaseStorage
-import kotlinx.coroutines.Dispatchers
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
+import com.google.firebase.storage.ktx.storage
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withContext
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.long
+import kotlinx.serialization.json.longOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import kotlin.math.atan2
+import kotlin.math.asin
 import kotlin.math.cos
+import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/**
- * Centralized manager for all authentication operations
- */
-class AuthManager(private val context: Context) {
+private const val TAG = "AuthManager"
+
+/* ------------------------------------------------------------------------- */
+/*  Serializador para que KotlinX + Firestore manejen Uri de forma transparente */
+/* ------------------------------------------------------------------------- */
+object UriSerializer : KSerializer<Uri> {
+    override val descriptor = PrimitiveSerialDescriptor("Uri", PrimitiveKind.STRING)
+    override fun serialize(encoder: Encoder, value: Uri) = encoder.encodeString(value.toString())
+    override fun deserialize(decoder: Decoder): Uri = decoder.decodeString().toUri()
+}
+
+
+// antes
+private val json = Json {
+    ignoreUnknownKeys = true      // ← ¡importante!
+    coerceInputValues = true
+    encodeDefaults = true
+}
+
+/* ------------------------------------------------------------------------- */
+/*                       Modelo persistente de perfil                         */
+/* ------------------------------------------------------------------------- */
+@Serializable
+data class UserProfile(
+    val displayName: String? = null,
+    @Serializable(with = UriSerializer::class) val photoUrl: Uri? = null,
+    val age: Int? = null,
+    val location: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val isProfileComplete: Boolean = false,
+    val isSenior: Boolean = false,
+    val communities: List<String> = emptyList(),
+    val notificationTokens: List<String> = emptyList()
+)
+
+
+/* ----------------------------- helpers Json <-> Map ---------------------- */
+private fun JsonPrimitive.asAny(): Any = when {
+    isString -> content
+    booleanOrNull != null -> boolean
+    intOrNull != null -> int
+    longOrNull != null -> long
+    doubleOrNull != null -> double
+    else -> content
+}
+
+private fun JsonElement.toMap(): Any? = when (this) {
+    JsonNull -> null
+    is JsonPrimitive -> asAny()
+    is JsonArray -> map { it.toMap() }
+    is JsonObject -> mapValues { (_, v) -> v.toMap() }
+}
+
+private fun Any?.toJsonElement(): JsonElement = when (this) {
+    null -> JsonNull
+    is JsonElement -> this
+    is Map<*, *> -> JsonObject(entries.associate { (k, v) -> k.toString() to v.toJsonElement() })
+    is Iterable<*> -> JsonArray(map { it.toJsonElement() })
+    is Number, is Boolean -> JsonPrimitive(this.toString())
+    else -> JsonPrimitive(toString())
+}
+
+/* ------------------------------- HTTP cliente ---------------------------- */
+private val http by lazy {
+    OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
+}
+
+/* ------------------------------------------------------------------------- */
+/*                                MANAGER                                    */
+/* ------------------------------------------------------------------------- */
+class AuthManager(private val ctx: Context) {
 
     private val auth = FirebaseAuth.getInstance()
-    private val oneTapClient = Identity.getSignInClient(context)
+    private val oneTap = Identity.getSignInClient(ctx)
+    private val fs = Firebase.firestore
+    private val storage = Firebase.storage
 
-    /**
-     * Get current user as a flow
-     */
+    /* --------- flujo de usuario ---------------- */
     val currentUser: Flow<FirebaseUser?> = callbackFlow {
-        val listener = FirebaseAuth.AuthStateListener { auth ->
-            trySend(auth.currentUser)
-        }
-        auth.addAuthStateListener(listener)
-        awaitClose { auth.removeAuthStateListener(listener) }
+        val l = FirebaseAuth.AuthStateListener { trySend(it.currentUser) }
+        auth.addAuthStateListener(l); awaitClose { auth.removeAuthStateListener(l) }
     }
 
+    /* --------- flujo de perfil ----------------- */
     fun profile(uid: String): Flow<UserProfile?> = callbackFlow {
-        val docRef = FirebaseFirestore.getInstance()
-            .collection("users")
-            .document(uid)
-
-        val listener = docRef.addSnapshotListener { snap, _ ->
-            trySend(
-                if (snap != null && snap.exists()) {
-                    snap.toObject(UserProfile::class.java)
-                } else null
-            )
-        }
-        awaitClose { listener.remove() }
+        val l = fs.collection("users").document(uid)
+            .addSnapshotListener { snap, _ ->
+                val profile = snap?.data?.let { data ->
+                    json.decodeFromJsonElement<UserProfile>(
+                        JsonObject(data.mapValues { (_, v) -> v.toJsonElement() })
+                    )
+                }
+                trySend(profile)
+            }
+        awaitClose { l.remove() }
     }
 
-
-    /**
-     * Get current user synchronously
-     */
-    fun getCurrentUser(): FirebaseUser? = auth.currentUser
-
-    /**
-     * Add auth state listener
-     */
-    fun addAuthStateListener(listener: (FirebaseUser?) -> Unit): FirebaseAuth.AuthStateListener {
-        val authStateListener = FirebaseAuth.AuthStateListener { auth ->
-            listener(auth.currentUser)
-        }
-        auth.addAuthStateListener(authStateListener)
-        return authStateListener
-    }
-
-    /**
-     * Remove auth state listener
-     */
-    fun removeAuthStateListener(listener: FirebaseAuth.AuthStateListener) {
-        auth.removeAuthStateListener(listener)
-    }
-
-    suspend fun getGoogleOneTapIntent(): Result<IntentSenderRequest> = runCatching {
-        val result = oneTapClient.beginSignIn(getGoogleSignInRequest()).await()
-        IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
-    }
-
-
-    /**
-     * Get Google Sign-In request configuration
-     */
-    private fun getGoogleSignInRequest(): BeginSignInRequest {
-        return BeginSignInRequest.builder()
+    /* ----------------- Google One-Tap ---------- */
+    private fun googleReq(): BeginSignInRequest =
+        BeginSignInRequest.builder()
             .setGoogleIdTokenRequestOptions(
                 BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
                     .setSupported(true)
-                    .setServerClientId(context.getString(com.vecinapp.R.string.default_web_client_id))
+                    .setServerClientId(ctx.getString(com.vecinapp.R.string.default_web_client_id))
                     .setFilterByAuthorizedAccounts(false)
                     .build()
             )
             .setAutoSelectEnabled(false)
             .build()
+
+    suspend fun getGoogleOneTapIntent(): Result<IntentSenderRequest> = runCatching {
+        val res = oneTap.beginSignIn(googleReq()).await()
+        IntentSenderRequest.Builder(res.pendingIntent.intentSender).build()
     }
 
-    /**
-     * Begin Google Sign-In process
-     */
-    fun beginGoogleSignIn(
-        onSuccess: (IntentSenderRequest) -> Unit,
-        onFailure: (Exception) -> Unit
-    ) {
-        oneTapClient.beginSignIn(getGoogleSignInRequest())
-            .addOnSuccessListener { result ->
-                val intentSenderRequest =
-                    IntentSenderRequest.Builder(result.pendingIntent.intentSender).build()
-                onSuccess(intentSenderRequest)
-            }
-            .addOnFailureListener { e ->
-                Log.e(TAG, "One-Tap failed: ${e.localizedMessage}")
-                onFailure(e)
-            }
+    /* ----------------- Auth -------------------- */
+    suspend fun firebaseAuthWithGoogle(idToken: String) = runCatching {
+        val cred = GoogleAuthProvider.getCredential(idToken, null)
+        auth.signInWithCredential(cred).await().user!!
     }
 
-    /**
-     * Authenticate with Google ID token
-     */
-    suspend fun firebaseAuthWithGoogle(idToken: String): Result<FirebaseUser> {
-        return try {
-            val credential = GoogleAuthProvider.getCredential(idToken, null)
-            val result = auth.signInWithCredential(credential).await()
-            Result.success(result.user!!)
-        } catch (e: Exception) {
-            Log.e(TAG, "GoogleAuth error: ${e.message}")
-            Result.failure(e)
+    suspend fun signInWithCredential(c: AuthCredential) =
+        runCatching { auth.signInWithCredential(c).await().user!! }
+
+    suspend fun signInAnonymously() = runCatching { auth.signInAnonymously().await().user!! }
+
+    fun signOut() = auth.signOut()
+    fun isPhoneLinked() = auth.currentUser?.phoneNumber != null
+
+    /* ----------------- Perfil (1-shot) --------- */
+    suspend fun getUserProfile(uid: String): UserProfile = fs.collection("users")
+        .document(uid).get().await().let { snap ->
+            if (!snap.exists()) UserProfile()
+            else json.decodeFromJsonElement(
+                JsonObject(snap.data!!.mapValues { it.value.toJsonElement() })
+            )
         }
-    }
+    /* ---------------------------------------------------------------- */
+    /* ------------  funcionalidades específicas de Phone OTP ----------*/
+    /* ---------------------------------------------------------------- */
 
-    /**
-     * Start phone verification process
-     */
     fun startPhoneVerification(
         phoneNumber: String,
         activity: Context,
@@ -168,9 +217,6 @@ class AuthManager(private val context: Context) {
         PhoneAuthProvider.verifyPhoneNumber(options)
     }
 
-    /**
-     * Resend verification code
-     */
     fun resendVerificationCode(
         phoneNumber: String,
         token: PhoneAuthProvider.ForceResendingToken,
@@ -188,172 +234,21 @@ class AuthManager(private val context: Context) {
     }
 
     /**
-     * Verify phone number with code
+     * Convierte el par verification-ID + code en un PhoneAuthCredential
+     * para luego autenticar o vincular la cuenta.
      */
     suspend fun verifyPhoneNumberWithCode(
         verificationId: String,
         code: String
-    ): Result<PhoneAuthCredential> {
-        return try {
-            val credential = PhoneAuthProvider.getCredential(verificationId, code)
-            Result.success(credential)
-        } catch (e: Exception) {
-            Log.e(TAG, "Verification code error: ${e.message}")
-            Result.failure(e)
-        }
+    ): Result<PhoneAuthCredential> = runCatching {
+        PhoneAuthProvider.getCredential(verificationId, code)
     }
 
-    /**
-     * Link phone number to existing account
-     */
-    suspend fun linkPhoneNumberToAccount(
-        credential: PhoneAuthCredential
-    ): Result<FirebaseUser> {
-        val currentUser = auth.currentUser
-
-        return if (currentUser != null) {
-            try {
-                val result = currentUser.linkWithCredential(credential).await()
-                Result.success(result.user!!)
-            } catch (e: Exception) {
-                Log.e(TAG, "Error linking phone: ${e.message}")
-                Result.failure(e)
-            }
-        } else {
-            Result.failure(Exception("No user is currently signed in"))
-        }
-    }
-
-    /**
-     * Sign in anonymously
-     */
-    suspend fun signInAnonymously(): Result<FirebaseUser> {
-        return try {
-            val result = auth.signInAnonymously().await()
-            Result.success(result.user!!)
-        } catch (e: Exception) {
-            Log.e(TAG, "Anonymous auth error: ${e.message}")
-            Result.failure(e)
-        }
-    }
-
-    /**
-     * Sign out
-     */
-    fun signOut() {
-        auth.signOut()
-    }
-
-    /**
-     * Check if user has phone linked
-     */
-    fun isPhoneLinked(): Boolean {
-        return auth.currentUser?.phoneNumber != null
-    }
-
-
-    suspend fun signInWithCredential(credential: AuthCredential): Result<FirebaseUser> {
-        return try {
-            val result = auth.signInWithCredential(credential).await()
-            Result.success(result.user!!)
-        } catch (e: Exception) {
-            Log.e(TAG, "Sign in with credential error: ${e.message}")
-            Result.failure(e)
-        }
-    }
-
-    companion object {
-        private const val TAG = "AuthManager"
-    }
-
-    /**
-     * User profile data class
-     */
-    data class UserProfile(
-        val displayName: String? = null,
-        val photoUrl: String? = null,
-        val age: Int? = null,
-        val location: String? = null,
-        val latitude: Double? = null,
-        val longitude: Double? = null,
-        val isProfileComplete: Boolean = false,
-        val isSenior: Boolean = false
-    )
-
-    /**
-     * Check if user profile is complete
-     * Returns true if the user has all required profile data
-     */
-    suspend fun isProfileComplete(userId: String): Boolean {
-        try {
-            // Get user profile data from Firestore
-            val userProfile = getUserProfile(userId)
-
-            // Define what constitutes a "complete" profile
-            // For example, we require displayName, age, and location
-            return userProfile.isProfileComplete
-        } catch (e: Exception) {
-            Log.e(TAG, "Error checking profile completeness: ${e.message}")
-            return false
-        }
-    }
-
-    /**
-     * Get user profile data from Firestore
-     */
-    suspend fun getUserProfile(userId: String): UserProfile {
-        return try {
-            // Get user document from Firestore
-            val userDoc = FirebaseFirestore.getInstance()
-                .collection("users")
-                .document(userId)
-                .get()
-                .await()
-
-            // Get Firebase Auth user for basic profile info
-            val authUser = getCurrentUser()
-
-            if (userDoc.exists()) {
-                // User has a profile document in Firestore
-                val age = userDoc.getLong("age")?.toInt()
-                val location = userDoc.getString("location")
-                val latitude = userDoc.getDouble("latitude")
-                val longitude = userDoc.getDouble("longitude")
-                val isSenior = userDoc.getBoolean("isSenior") ?: false
-                val isComplete = userDoc.getBoolean("isProfileComplete") ?: false
-
-                UserProfile(
-                    displayName = authUser?.displayName,
-                    photoUrl = authUser?.photoUrl?.toString(),
-                    age = age,
-                    location = location,
-                    latitude = latitude,
-                    longitude = longitude,
-                    isProfileComplete = isComplete,
-                    isSenior = isSenior
-                )
-            } else {
-                // User doesn't have a profile document yet
-                UserProfile(
-                    displayName = authUser?.displayName,
-                    photoUrl = authUser?.photoUrl?.toString(),
-                    isProfileComplete = false,
-                    isSenior = false
-                )
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting user profile: ${e.message}")
-            UserProfile(isProfileComplete = false, isSenior = false)
-        }
-    }
-
-    /**
-     * Update user profile data
-     */
+    /* ----------------- Perfil (update) --------- */
     suspend fun updateUserProfile(
         userId: String,
         displayName: String? = null,
-        photoUri: Uri? = null,      // pública; se usará en Auth y Firestore
+        photoUri: Uri? = null,
         age: Int? = null,
         location: String? = null,
         latitude: Double? = null,
@@ -361,37 +256,36 @@ class AuthManager(private val context: Context) {
         isProfileComplete: Boolean = false,
         isSenior: Boolean = false
     ): Result<UserProfile> = runCatching {
-        val user = getCurrentUser() ?: error("No user signed in")
+        val u = auth.currentUser ?: error("No user signed in")
 
-        /* ---------- 1. Firebase Auth ---------- */
+        /* 1. Auth profile */
         if (displayName != null || photoUri != null) {
-            val req = UserProfileChangeRequest.Builder().apply {
-                displayName?.let(::setDisplayName)
-                photoUri?.let(::setPhotoUri)          // <- guarda en Auth
-            }.build()
-            user.updateProfile(req).await()
+            u.updateProfile(
+                UserProfileChangeRequest.Builder().apply {
+                    displayName?.let(::setDisplayName)
+                    photoUri?.let(::setPhotoUri)
+                }.build()
+            ).await()
         }
 
-        /* ---------- 2. Firestore -------------- */
-        val data = mutableMapOf<String, Any>(
+        /* 2. Firestore */
+        val map = mutableMapOf<String, Any?>(
             "isProfileComplete" to isProfileComplete,
             "isSenior" to isSenior,
-            "updatedAt" to FieldValue.serverTimestamp()
+            "updatedAt" to com.google.firebase.Timestamp.now()
         )
-        age?.let { data["age"] = it }
-        location?.let { data["location"] = it }
-        latitude?.let { data["latitude"] = it }
-        longitude?.let { data["longitude"] = it }
-        photoUri?.let { data["photoUrl"] = it.toString() }   // <- NUEVO
+        age?.let { map["age"] = it }
+        location?.let { map["location"] = it }
+        latitude?.let { map["latitude"] = it }
+        longitude?.let { map["longitude"] = it }
+        photoUri?.let { map["photoUrl"] = it.toString() }
 
-        FirebaseFirestore.getInstance()
-            .collection("users").document(userId)
-            .set(data, SetOptions.merge()).await()
+        fs.collection("users").document(userId).set(map, SetOptions.merge()).await()
 
-        /* ---------- 3. Objeto de retorno ------- */
+        /* 3. DTO resultante */
         UserProfile(
-            displayName = user.displayName,
-            photoUrl = photoUri?.toString(),
+            displayName = u.displayName,
+            photoUrl = photoUri,
             age = age,
             location = location,
             latitude = latitude,
@@ -401,280 +295,59 @@ class AuthManager(private val context: Context) {
         )
     }
 
-
-    /**
-     * Upload profile photo and return the download URL
-     */
-    suspend fun uploadProfilePhoto(photoUri: Uri): Result<Uri> = runCatching {
-        val user = getCurrentUser() ?: error("No user")
-        val ref = FirebaseStorage.getInstance()
-            .reference.child("profile_photos/${user.uid}/${UUID.randomUUID()}")
-        ref.putFile(photoUri).await()
-        ref.downloadUrl.await()                     // <- URL pública
+    /* ------- Subida de foto de perfil -------- */
+    suspend fun uploadProfilePhoto(local: Uri): Result<Uri> = runCatching {
+        val uid = auth.uid ?: error("No user")
+        val ref = storage.reference.child("profile_photos/$uid/${UUID.randomUUID()}")
+        ref.putFile(local).await()
+        ref.downloadUrl.await()
     }
 
+    /* ---------- geocodificación --------------- */
+    suspend fun getCityFromLocation(lat: Double, lon: Double): String = runCatching {
+        Geocoder(ctx, Locale.getDefault())
+            .getFromLocation(lat, lon, 1)
+            ?.firstOrNull()?.locality
+    }.getOrNull()?.takeIf { it.isNotBlank() }
+        ?: reverseGeocode(lat, lon)
+        ?: approximate(lat, lon)
 
-    /**
-     * Get only the city name from latitude and longitude
-     * Makes multiple attempts to get a valid city name
-     */
-    suspend fun getCityFromLocation(latitude: Double, longitude: Double): Result<String> {
-        return try {
-            val geocoder = Geocoder(context, Locale.getDefault())
-
-            // For Android 13+ (API 33+)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                var cityResult = ""
-                val latch = CountDownLatch(1)
-
-                geocoder.getFromLocation(latitude, longitude, 5) { addresses ->
-                    if (addresses.isNotEmpty()) {
-                        // Try multiple addresses to find one with a valid locality
-                        for (address in addresses) {
-                            // First priority: locality (city)
-                            if (!address.locality.isNullOrEmpty()) {
-                                cityResult = address.locality
-                                break
-                            }
-
-                            // Second priority: subAdminArea (county/district)
-                            if (!address.subAdminArea.isNullOrEmpty()) {
-                                cityResult = address.subAdminArea
-                                // Don't break, keep looking for a locality
-                            }
-
-                            // Third priority: adminArea (state/province)
-                            if (cityResult.isEmpty() && !address.adminArea.isNullOrEmpty()) {
-                                cityResult = address.adminArea
-                            }
-                        }
-
-                        // If still no result, try to parse from address line
-                        if (cityResult.isEmpty() && addresses[0].maxAddressLineIndex >= 0) {
-                            val addressLine = addresses[0].getAddressLine(0)
-                            // Try to extract city from address line
-                            val parts = addressLine.split(',')
-                            if (parts.size >= 2) {
-                                // Usually the city is the second component in the address
-                                cityResult = parts[1].trim()
-                            } else if (parts.isNotEmpty()) {
-                                cityResult = parts[0].trim()
-                            }
-                        }
-                    }
-                    latch.countDown()
-                }
-
-                // Wait for the geocoder callback to complete (with timeout)
-                latch.await(2, TimeUnit.SECONDS)
-
-                if (cityResult.isNotEmpty()) {
-                    Result.success(cityResult)
-                } else {
-                    // If geocoder failed, try reverse geocoding with a different approach
-                    val result = reverseGeocodeFallback(latitude, longitude)
-                    if (result.isNotEmpty()) {
-                        Result.success(result)
-                    } else {
-                        // Last resort: use a geographic region approximation
-                        Result.success(approximateLocationToCity(latitude, longitude))
-                    }
-                }
-            } else {
-                // For older Android versions
-                @Suppress("DEPRECATION")
-                val addresses = geocoder.getFromLocation(latitude, longitude, 5)
-
-                if (addresses != null && addresses.isNotEmpty()) {
-                    var cityResult = ""
-
-                    // Try multiple addresses to find one with a valid locality
-                    for (address in addresses) {
-                        // First priority: locality (city)
-                        if (!address.locality.isNullOrEmpty()) {
-                            cityResult = address.locality
-                            break
-                        }
-
-                        // Second priority: subAdminArea (county/district)
-                        if (!address.subAdminArea.isNullOrEmpty()) {
-                            cityResult = address.subAdminArea
-                            // Don't break, keep looking for a locality
-                        }
-
-                        // Third priority: adminArea (state/province)
-                        if (cityResult.isEmpty() && !address.adminArea.isNullOrEmpty()) {
-                            cityResult = address.adminArea
-                        }
-                    }
-
-                    // If still no result, try to parse from address line
-                    if (cityResult.isEmpty() && addresses[0].maxAddressLineIndex >= 0) {
-                        val addressLine = addresses[0].getAddressLine(0)
-                        // Try to extract city from address line
-                        val parts = addressLine.split(',')
-                        if (parts.size >= 2) {
-                            // Usually the city is the second component in the address
-                            cityResult = parts[1].trim()
-                        } else if (parts.isNotEmpty()) {
-                            cityResult = parts[0].trim()
-                        }
-                    }
-
-                    if (cityResult.isNotEmpty()) {
-                        Result.success(cityResult)
-                    } else {
-                        // If geocoder failed, try reverse geocoding with a different approach
-                        val result = reverseGeocodeFallback(latitude, longitude)
-                        if (result.isNotEmpty()) {
-                            Result.success(result)
-                        } else {
-                            // Last resort: use a geographic region approximation
-                            Result.success(approximateLocationToCity(latitude, longitude))
-                        }
-                    }
-                } else {
-                    // If geocoder returned no addresses, try fallback methods
-                    val result = reverseGeocodeFallback(latitude, longitude)
-                    if (result.isNotEmpty()) {
-                        Result.success(result)
-                    } else {
-                        // Last resort: use a geographic region approximation
-                        Result.success(approximateLocationToCity(latitude, longitude))
-                    }
-                }
+    /* ---------- helpers privados -------------- */
+    private suspend fun reverseGeocode(lat: Double, lon: Double): String? = runCatching {
+        val url =
+            "https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=10"
+        val resp = http.newCall(
+            Request.Builder().url(url).header("User-Agent", "VecinApp Android").build()
+        ).execute()
+        if (!resp.isSuccessful) return null
+        val address = JSONObject(resp.body!!.string()).optJSONObject("address") ?: return null
+        listOf("city", "town", "village", "municipality", "county", "state")
+            .firstNotNullOfOrNull { key ->
+                address.optString(key).takeIf { it.isNotBlank() }
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting city from location: ${e.message}")
-            // Try fallback methods even on exception
-            try {
-                val result = reverseGeocodeFallback(latitude, longitude)
-                if (result.isNotEmpty()) {
-                    Result.success(result)
-                } else {
-                    // Last resort: use a geographic region approximation
-                    Result.success(approximateLocationToCity(latitude, longitude))
-                }
-            } catch (e2: Exception) {
-                Log.e(TAG, "Error in fallback geocoding: ${e2.message}")
-                Result.success(approximateLocationToCity(latitude, longitude))
-            }
-        }
-    }
+    }.getOrNull()
 
-    /**
-     * Fallback method to get city name using a network request to a geocoding service
-     * This is used when the Android Geocoder fails
-     */
-    private suspend fun reverseGeocodeFallback(latitude: Double, longitude: Double): String {
-        return try {
-            // Use a simple HTTP request to OpenStreetMap Nominatim API
-            // Note: In a production app, you should use a proper geocoding service with an API key
-            val url =
-                "https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude&zoom=10"
-
-            val client = OkHttpClient.Builder()
-                .connectTimeout(5, TimeUnit.SECONDS)
-                .readTimeout(5, TimeUnit.SECONDS)
-                .build()
-
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "VecinApp Android Client")
-                .build()
-
-            withContext(Dispatchers.IO) {
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    val jsonString = response.body?.string() ?: ""
-                    val jsonObject = JSONObject(jsonString)
-
-                    // Try to extract city from the response
-                    val address = jsonObject.optJSONObject("address")
-                    if (address != null) {
-                        // Try different fields that might contain the city name
-                        when {
-                            address.has("city") -> address.getString("city")
-                            address.has("town") -> address.getString("town")
-                            address.has("village") -> address.getString("village")
-                            address.has("municipality") -> address.getString("municipality")
-                            address.has("county") -> address.getString("county")
-                            address.has("state") -> address.getString("state")
-                            else -> ""
-                        }
-                    } else {
-                        ""
-                    }
-                } else {
-                    ""
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in reverseGeocodeFallback: ${e.message}")
-            ""
-        }
-    }
-
-    /**
-     * Approximate a location to a city based on geographic regions
-     * This is a last resort when all geocoding methods fail
-     */
-    private fun approximateLocationToCity(latitude: Double, longitude: Double): String {
-        // Define some major cities with their approximate coordinates
-        val cities = listOf(
-            Pair("Santiago", Pair(-33.4489, -70.6693)),
-            Pair("Temuco", Pair(-38.7359, -72.5904)),
-            Pair("Concepción", Pair(-36.8201, -73.0440)),
-            Pair("Valparaíso", Pair(-33.0472, -71.6127)),
-            Pair("Antofagasta", Pair(-23.6509, -70.3975)),
-            Pair("La Serena", Pair(-29.9027, -71.2525)),
-            Pair("Puerto Montt", Pair(-41.4693, -72.9424)),
-            Pair("Arica", Pair(-18.4783, -70.3126)),
-            Pair("Iquique", Pair(-20.2208, -70.1431)),
-            Pair("Rancagua", Pair(-34.1708, -70.7444)),
-            Pair("Talca", Pair(-35.4264, -71.6553)),
-            Pair("Chillán", Pair(-36.6064, -72.1034)),
-            Pair("Calama", Pair(-22.4524, -68.9204)),
-            Pair("Osorno", Pair(-40.5714, -73.1392)),
-            Pair("Valdivia", Pair(-39.8142, -73.2459))
+    private fun approximate(lat: Double, lon: Double): String {
+        val cities = mapOf(
+            "Santiago" to (-33.4489 to -70.6693),
+            "Concepción" to (-36.8201 to -73.0440),
+            "Valparaíso" to (-33.0472 to -71.6127),
+            "Temuco" to (-38.7359 to -72.5904)
         )
-
-        // Find the closest city based on distance
-        var closestCity = "Santiago" // Default to Santiago if no match
-        var minDistance = Double.MAX_VALUE
-
-        for ((cityName, coords) in cities) {
-            val cityLat = coords.first
-            val cityLon = coords.second
-
-            // Calculate distance using Haversine formula
-            val distance = calculateDistance(latitude, longitude, cityLat, cityLon)
-
-            if (distance < minDistance) {
-                minDistance = distance
-                closestCity = cityName
-            }
-        }
-
-        return closestCity
+        return cities.minBy { (_, c) -> haversine(lat, lon, c.first, c.second) }.key
     }
 
-    /**
-     * Calculate distance between two points using Haversine formula
-     */
-    private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371 // Earth radius in kilometers
-
-        val latDistance = Math.toRadians(lat2 - lat1)
-        val lonDistance = Math.toRadians(lon2 - lon1)
-
-        val a = sin(latDistance / 2) * sin(latDistance / 2) +
+    private fun haversine(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dLat = Math.toRadians(lat2 - lat1)
+        val dLon = Math.toRadians(lon2 - lon1)
+        val a = sin(dLat / 2).pow(2) +
                 cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                sin(lonDistance / 2) * sin(lonDistance / 2)
-
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-
-        return r * c
+                sin(dLon / 2).pow(2)
+        return 2 * 6371 * asin(sqrt(a))
     }
 
+    /* ---------- helper público --------------- */
+    suspend fun isProfileComplete(uid: String): Boolean = runCatching {
+        getUserProfile(uid).isProfileComplete
+    }.getOrDefault(false)
 }

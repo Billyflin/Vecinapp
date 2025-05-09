@@ -63,21 +63,30 @@ fun LoginScreen(
     val scope = rememberCoroutineScope()
 
     /* ----- token handler ----- */
+    /* ----- token handler ----- */
     fun handleToken(idToken: String) {
         isLoading = true
         scope.launch {
-            authManager.firebaseAuthWithGoogle(idToken)
-                .onSuccess { user ->
-                    isLoading = false
-                    if (authManager.isProfileComplete(user.uid)) onSignInSuccess()
-                    else onProfileIncomplete()
-                }
-                .onFailure { e ->
-                    isLoading = false
+            // 1️⃣  autenticamos con Google
+            val result = authManager.firebaseAuthWithGoogle(idToken)
+
+            result.fold(
+                onSuccess = { user ->
+                    // 2️⃣  ya estamos dentro de una corrutina: podemos llamar a funciones suspend
+                    val complete = authManager.isProfileComplete(user.uid)
+
+                    if (complete) onSignInSuccess()     // → Dashboard
+                    else onProfileIncomplete() // → wizard de perfil
+                },
+                onFailure = { e ->
                     snackbarHostState.showSnackbar("Error: ${e.message}")
                 }
+            )
+
+            isLoading = false
         }
     }
+
 
     /* ----- One-Tap launcher ----- */
     val launcher =
