@@ -209,7 +209,8 @@ fun SettingsScreen(
                                                 userId = firebaseUser.uid,
                                                 displayName = displayName,
                                                 photoUri = remoteUrl,
-                                                age = age
+                                                age = age,
+                                                isProfileComplete = true
                                             )
 
                                             if (res.isSuccess) {
