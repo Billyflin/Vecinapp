@@ -48,6 +48,7 @@ android {
 
 dependencies {
     implementation(libs.hilt.android)
+    implementation(libs.androidx.compose.material)
     ksp(libs.hilt.compiler) // o kapt(libs.hilt.compiler) si usas kapt
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.core.ktx)

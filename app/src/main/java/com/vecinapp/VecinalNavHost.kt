@@ -25,6 +25,8 @@ import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
 import com.vecinapp.auth.UserProfile
 import com.vecinapp.presentation.BottomNavigationBar
+import com.vecinapp.ui.screen.CommunitiesScreenWithMockData
+import com.vecinapp.ui.screen.EventsScreenWithMockData
 import com.vecinapp.ui.screen.HomeScreen
 import com.vecinapp.ui.screen.LoginScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
@@ -179,12 +181,12 @@ fun VecinalNavHost(
 
             /* -------------- Comunidades -------------- */
             composable<ScreenCommunities> {
-                Text("Communities")
+                CommunitiesScreenWithMockData()
             }
 
             /* -------------- Eventos -------------- */
             composable<ScreenEventos> {
-                Text("Eventos")
+                EventsScreenWithMockData()
             }
 
 
