@@ -23,6 +23,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CalendarMonth
@@ -110,15 +111,15 @@ import kotlin.random.Random
 @Composable
 fun CommunitiesScreenWithMockData() {
     val communities = createMockCommunities()
-    val currentUserId = "user123" // ID de usuario de ejemplo
+    val currentUserId = "user123" // Example user ID
 
-    // Estado para controlar qué comunidad está seleccionada
+    // State to control which community is selected
     var selectedCommunity by remember { mutableStateOf<Community?>(null) }
     var isSearchActive by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var filterDistance by remember { mutableStateOf(5) } // km
 
-    // Determinar si el usuario es miembro de la comunidad seleccionada
+    // Determine if the user is a member of the selected community
     val isMember = selectedCommunity?.members?.any { it.userId == currentUserId } ?: false
 
     Surface(
@@ -126,25 +127,24 @@ fun CommunitiesScreenWithMockData() {
         color = MaterialTheme.colorScheme.background
     ) {
         if (selectedCommunity != null) {
-            // Vista detallada de la comunidad
+            // Detailed community view
             CommunityDetailScreen(
                 community = selectedCommunity!!,
                 isMember = isMember,
                 currentUserId = currentUserId,
                 onBackClick = { selectedCommunity = null },
-                onJoinClick = { /* Simular unirse */ },
-                onLeaveClick = { /* Simular salir */ }
+                onJoinClick = { /* Simulate joining */ },
+                onLeaveClick = { /* Simulate leaving */ }
             )
         } else {
-            // Lista de comunidades
+            // Communities list
             Scaffold(
                 topBar = {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        // Barra de búsqueda
-                        val onActiveChange = { isSearchActive = it }
-                        val colors1 =
-                            SearchBarDefaults.colors()// Slider para la distancia (simplificado con chips)
-                        // Sugerencias de búsqueda
+                        // Search bar
+                        val colors = SearchBarDefaults.colors()
+                        val onActiveChange = { isSearchActive = it }// Distance filter chips
+                        // Search suggestions
                         SearchBar(
                             inputField = {
                                 SearchBarDefaults.InputField(
@@ -154,22 +154,22 @@ fun CommunitiesScreenWithMockData() {
                                     expanded = isSearchActive,
                                     onExpandedChange = onActiveChange,
                                     enabled = true,
-                                    placeholder = { Text("Buscar comunidades cercanas") },
+                                    placeholder = { Text("Search nearby communities") },
                                     leadingIcon = {
                                         Icon(
                                             Icons.Default.Search,
-                                            contentDescription = "Buscar"
+                                            contentDescription = "Search"
                                         )
                                     },
                                     trailingIcon = {
-                                        IconButton(onClick = { /* Abrir filtros */ }) {
+                                        IconButton(onClick = { /* Open filters */ }) {
                                             Icon(
                                                 Icons.Default.FilterList,
-                                                contentDescription = "Filtros"
+                                                contentDescription = "Filters"
                                             )
                                         }
                                     },
-                                    colors = colors1.inputFieldColors,
+                                    colors = colors.inputFieldColors,
                                     interactionSource = null,
                                 )
                             },
@@ -179,23 +179,23 @@ fun CommunitiesScreenWithMockData() {
                                 .fillMaxWidth()
                                 .padding(16.dp),
                             shape = SearchBarDefaults.inputFieldShape,
-                            colors = colors1,
+                            colors = colors,
                             tonalElevation = SearchBarDefaults.TonalElevation,
                             shadowElevation = SearchBarDefaults.ShadowElevation,
                             windowInsets = SearchBarDefaults.windowInsets,
                             content = fun ColumnScope.() {
-                                // Sugerencias de búsqueda
+                                // Search suggestions
                                 Column(
                                     modifier = Modifier.padding(16.dp)
                                 ) {
                                     Text(
-                                        "Filtrar por distancia: $filterDistance km",
+                                        "Filter by distance: $filterDistance km",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
 
                                     Spacer(modifier = Modifier.height(8.dp))
 
-                                    // Slider para la distancia (simplificado con chips)
+                                    // Distance filter chips
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceEvenly
@@ -229,10 +229,10 @@ fun CommunitiesScreenWithMockData() {
                             },
                         )
 
-                        // Título de la sección
+                        // Section title
                         if (!isSearchActive) {
                             Text(
-                                text = "Comunidades cercanas",
+                                text = "Nearby Communities",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -242,18 +242,18 @@ fun CommunitiesScreenWithMockData() {
                 },
                 floatingActionButton = {
                     FloatingActionButton(
-                        onClick = { /* Crear nueva comunidad */ },
+                        onClick = { /* Create new community */ },
                         containerColor = MaterialTheme.colorScheme.primary
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Crear comunidad",
+                            contentDescription = "Create community",
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
                 }
             ) { paddingValues ->
-                // Lista de comunidades filtradas
+                // Filtered communities list
                 val filteredCommunities = communities.filter {
                     (it.name.contains(searchQuery, ignoreCase = true) ||
                             it.description?.contains(searchQuery, ignoreCase = true) == true) &&
@@ -269,7 +269,7 @@ fun CommunitiesScreenWithMockData() {
                     ),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Sección de comunidades a las que pertenece el usuario
+                    // User's communities section
                     val userCommunities = communities.filter {
                         it.members.any { member -> member.userId == currentUserId }
                     }
@@ -277,7 +277,7 @@ fun CommunitiesScreenWithMockData() {
                     if (userCommunities.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Mis comunidades",
+                                text = "My Communities",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
@@ -300,7 +300,7 @@ fun CommunitiesScreenWithMockData() {
                         }
                     }
 
-                    // Comunidades cercanas (excluyendo las del usuario)
+                    // Nearby communities (excluding user's communities)
                     val nearbyCommunities = filteredCommunities.filter {
                         !it.members.any { member -> member.userId == currentUserId }
                     }
@@ -308,7 +308,7 @@ fun CommunitiesScreenWithMockData() {
                     if (nearbyCommunities.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Descubre comunidades cercanas",
+                                text = "Discover Nearby Communities",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)

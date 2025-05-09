@@ -69,6 +69,7 @@ import coil.request.ImageRequest
 import com.vecinapp.PreferencesManager
 import com.vecinapp.UserPreferences
 import com.vecinapp.auth.AuthManager
+import com.vecinapp.auth.UserProfile
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -84,10 +85,18 @@ fun SettingsScreen(
     )
 
     /* ------------------------------------------------ perfil-flow */
-    val firebaseUser = authManager.currentUser.collectAsState(null).value
-    val profileState by firebaseUser?.uid?.let { uid ->
-        authManager.profile(uid).collectAsState(null)
-    } ?: remember { mutableStateOf(null) }
+    val firebaseUserState =
+        authManager.currentUser.collectAsState(initial = null)
+    val firebaseUser = firebaseUserState.value
+
+// Obtener el perfil del usuario si el uid es válido
+    val profileFlow = if (firebaseUser != null) {
+        authManager.profile.collectAsState(initial = null)
+    } else {
+        remember { mutableStateOf<UserProfile?>(null) }
+    }
+    val profileState = profileFlow.value
+
 
     /* ------------------------------------------------ estados locales */
     val scope = rememberCoroutineScope()

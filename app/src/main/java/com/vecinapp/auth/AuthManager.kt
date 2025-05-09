@@ -21,9 +21,12 @@ import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
@@ -133,6 +136,7 @@ private val http by lazy {
 /* ------------------------------------------------------------------------- */
 /*                                MANAGER                                    */
 /* ------------------------------------------------------------------------- */
+@OptIn(ExperimentalCoroutinesApi::class)
 class AuthManager(private val ctx: Context) {
 
     private val auth = FirebaseAuth.getInstance()
@@ -146,18 +150,27 @@ class AuthManager(private val ctx: Context) {
         auth.addAuthStateListener(l); awaitClose { auth.removeAuthStateListener(l) }
     }
 
-    /* --------- flujo de perfil ----------------- */
-    fun profile(uid: String): Flow<UserProfile?> = callbackFlow {
-        val l = fs.collection("users").document(uid)
+    /** Perfil del usuario actual en tiempo real            */
+    val profile: Flow<UserProfile?> = currentUser       // Flow<FirebaseUser?>
+        .flatMapLatest { user ->
+            if (user == null) flowOf(null)
+            else profileOf(user.uid)                    // 👈 función auxiliar
+        }
+
+    /* --------------------------------------------------- */
+    private fun profileOf(uid: String): Flow<UserProfile> = callbackFlow {
+        val listener = fs.collection("users").document(uid)
             .addSnapshotListener { snap, _ ->
                 val profile = snap?.data?.let { data ->
                     json.decodeFromJsonElement<UserProfile>(
                         JsonObject(data.mapValues { (_, v) -> v.toJsonElement() })
                     )
                 }
-                trySend(profile)
+                if (profile != null) {
+                    trySend(profile)
+                }
             }
-        awaitClose { l.remove() }
+        awaitClose { listener.remove() }
     }
 
     /* ----------------- Google One-Tap ---------- */
@@ -387,4 +400,6 @@ class AuthManager(private val ctx: Context) {
     suspend fun isProfileComplete(uid: String): Boolean = runCatching {
         getUserProfile(uid).isProfileComplete
     }.getOrDefault(false)
+
+
 }
