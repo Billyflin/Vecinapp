@@ -44,7 +44,7 @@ fun VecinalNavHost(
     /* 2.  cálculo FINITO del destino -------------------- */
 
 
-    val user = authManager.currentUser.collectAsState(null).value
+    val user by authManager.currentUser.collectAsState(null)
 
     // produceState ES suspend -> aquí sí se puede llamar a funciones suspend
     val profile by produceState<UserProfile?>(null, user?.uid) {
@@ -63,10 +63,9 @@ fun VecinalNavHost(
     /* -------- 4. UI -------- */
     Scaffold(
         bottomBar = {
-            // Mostramos la bottom bar sólo cuando el perfil existe Y está completo
             profile?.takeIf { it.isProfileComplete }?.let { p ->
                 BottomNavigationBar(
-                    navController = navController, user = p            // evita !! y es null-safe
+                    navController = navController, user = p
                 )
             }
         },
@@ -187,7 +186,12 @@ fun VecinalNavHost(
 
             /* ----------- Configuraciones --------------- */
             composable<ScreenSettings> {
-                SettingsScreen(prefs) { navController.popBackStack() }
+                SettingsScreen(
+                    authManager,
+                    prefs
+                ) {
+                    navController.popBackStack()
+                }
             }
         }
     }

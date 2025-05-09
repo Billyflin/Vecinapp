@@ -42,6 +42,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.long
@@ -83,7 +84,7 @@ private val json = Json {
 @Serializable
 data class UserProfile(
     val displayName: String? = null,
-    @Serializable(with = UriSerializer::class) val photoUrl: Uri? = null,
+    @Serializable(with = UriSerializer::class) val photoUrl: Any? = null,
     val age: Int? = null,
     val location: String? = null,
     val latitude: Double? = null,
@@ -294,6 +295,42 @@ class AuthManager(private val ctx: Context) {
             isSenior = isSenior
         )
     }
+
+
+    /* ▼▼▼  OVERLOAD “patch” – la cómoda –  ▼▼▼ */
+    suspend fun updateUserProfile(
+        displayName: String? = null,
+        photoUri: Uri? = null,
+        patch: UserProfile
+    ): Result<UserProfile> = runCatching {
+
+        val u = auth.currentUser ?: error("No user")
+        val id = u.uid
+
+        /* 1) Auth (solo si cambian nombre o foto) */
+        if (displayName != null || photoUri != null) {
+            u.updateProfile(
+                UserProfileChangeRequest.Builder().apply {
+                    displayName?.let(::setDisplayName)
+                    photoUri?.let(::setPhotoUri)
+                }.build()
+            ).await()
+        }
+
+        /* 2) Firestore → todo el objeto (merge)  */
+        json.encodeToJsonElement(patch).toMap()?.let {
+            fs.collection("users").document(id)
+                .set(it, SetOptions.merge())
+                .await()
+        }
+
+        /* 3) retorno */
+        patch.copy(
+            displayName = displayName ?: patch.displayName,
+            photoUrl = photoUri ?: patch.photoUrl
+        )
+    }
+
 
     /* ------- Subida de foto de perfil -------- */
     suspend fun uploadProfilePhoto(local: Uri): Result<Uri> = runCatching {
