@@ -3,7 +3,6 @@ package com.vecinapp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -26,6 +25,7 @@ import com.google.firebase.auth.PhoneAuthProvider
 import com.vecinapp.auth.AuthManager
 import com.vecinapp.auth.UserProfile
 import com.vecinapp.presentation.BottomNavigationBar
+import com.vecinapp.ui.screen.HomeScreen
 import com.vecinapp.ui.screen.LoginScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
@@ -161,15 +161,14 @@ fun VecinalNavHost(
 
             /* ---------------- Home ---------------- */
             composable<ScreenHome> {
-                Text("Dashboard")
-                Button(onClick = {
-                    authManager.signOut()
-                    navController.navigate(ScreenLogin) {
-                        popUpTo(ScreenHome) { inclusive = true }
+                HomeScreen(
+                    authManager = authManager,
+                    onBack = {
+                        navController.navigate(ScreenLogin) {
+                            popUpTo(ScreenHome) { inclusive = true }
+                        }
                     }
-                }) {
-
-                }
+                )
             }
 
             /*--------------- Notifications --------------- */
@@ -181,6 +180,11 @@ fun VecinalNavHost(
             /* -------------- Comunidades -------------- */
             composable<ScreenCommunities> {
                 Text("Communities")
+            }
+
+            /* -------------- Eventos -------------- */
+            composable<ScreenEventos> {
+                Text("Eventos")
             }
 
 
@@ -196,6 +200,7 @@ fun VecinalNavHost(
         }
     }
 }
+
 
 /* Pantalla de espera muy simple */
 @Composable

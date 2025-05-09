@@ -27,7 +27,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Diversity3
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -60,7 +63,10 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.vecinapp.ScreenCommunities
+import com.vecinapp.ScreenEventos
 import com.vecinapp.ScreenHome
+import com.vecinapp.ScreenNotifications
 import com.vecinapp.ScreenSettings
 import com.vecinapp.auth.UserProfile
 import kotlinx.coroutines.delay
@@ -109,46 +115,47 @@ fun BottomNavigationBar(navController: NavHostController, user: UserProfile?) {
                     .fillMaxSize()
                     .padding(horizontal = 8.dp)
             ) {
-                // Botón 1 - Chat Grupal
-//                NavBarItem(
-//                    icon = Icons.Rounded.Forum,
-//                    title = "Chat Grupal",
-//                    isSelected = currentRoute == ScreenAnuncios.toRoute(),
-//                    onClick = {
-//                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-//                        navController.navigate(ScreenAnuncios) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
-//                    })
-                // Botón 3 - Eventos
-//                NavBarItem(
-//                    icon = Icons.Default.Event,
-//                    title = "Eventos",
-//                    isSelected = currentRoute == ScreenEventos.toRoute(),
-//                    onClick = {
-//                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-//                        navController.navigate(ScreenEventos) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
-//                    })
+                // Botón 1 - Home
+                NavBarItem(
+                    icon = Icons.Rounded.Home,
+                    title = "Chat Grupal",
+                    isSelected = currentRoute == ScreenHome.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigate(ScreenHome) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
+                    })
+
+                // Botón 2 - Sugerencias
+                NavBarItem(
+                    icon = Icons.Default.Event,
+                    title = "Eventos",
+                    isSelected = currentRoute == ScreenEventos.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigate(ScreenEventos) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
+                    })
 
 
                 // Espacio para el FAB
                 Spacer(modifier = Modifier.width(64.dp))
-                // Botón 2 - Sugerencias
-//                NavBarItem(
-//                    icon = Icons.Default.Lightbulb,
-//                    title = "Sugerencias",
-//                    isSelected = currentRoute == ScreenSugerencias.toRoute(),
-//                    onClick = {
-//                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-//                        navController.navigate(ScreenSugerencias) {
-//                            popUpTo(navController.graph.startDestinationId)
-//                            launchSingleTop = true
-//                        }
-//                    })
+                // Botón 3 - Notifications
+                NavBarItem(
+                    icon = Icons.Default.Notifications,
+                    title = "Notificaciones",
+                    isSelected = currentRoute == ScreenNotifications.toRoute(),
+                    onClick = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        navController.navigate(ScreenNotifications) {
+                            popUpTo(navController.graph.startDestinationId)
+                            launchSingleTop = true
+                        }
+                    })
 
                 // Botón 4 - Cuenta (con foto de perfil si está disponible)
                 if (user?.photoUrl != null) {
@@ -192,7 +199,7 @@ fun BottomNavigationBar(navController: NavHostController, user: UserProfile?) {
             FloatingActionButton(
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    navController.navigate(ScreenHome) {
+                    navController.navigate(ScreenCommunities) {
                         popUpTo(navController.graph.startDestinationId)
                         launchSingleTop = true
                     }

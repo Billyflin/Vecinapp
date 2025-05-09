@@ -84,7 +84,7 @@ private val json = Json {
 @Serializable
 data class UserProfile(
     val displayName: String? = null,
-    @Serializable(with = UriSerializer::class) val photoUrl: Any? = null,
+    @Serializable(with = UriSerializer::class) val photoUrl: Uri? = null,
     val age: Int? = null,
     val location: String? = null,
     val latitude: Double? = null,
