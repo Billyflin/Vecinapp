@@ -150,7 +150,6 @@ class AuthManager(private val ctx: Context) {
         auth.addAuthStateListener(l); awaitClose { auth.removeAuthStateListener(l) }
     }
 
-    /** Perfil del usuario actual en tiempo real            */
     val profile: Flow<UserProfile?> = currentUser       // Flow<FirebaseUser?>
         .flatMapLatest { user ->
             if (user == null) flowOf(null)

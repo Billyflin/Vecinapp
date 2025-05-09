@@ -118,7 +118,7 @@ fun BottomNavigationBar(navController: NavHostController, user: UserProfile?) {
                 // Botón 1 - Home
                 NavBarItem(
                     icon = Icons.Rounded.Home,
-                    title = "Chat Grupal",
+                    title = "Inicio",
                     isSelected = currentRoute == ScreenHome.toRoute(),
                     onClick = {
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)

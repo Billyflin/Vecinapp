@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -29,6 +28,7 @@ import com.vecinapp.ui.screen.CommunitiesScreenWithMockData
 import com.vecinapp.ui.screen.EventsScreenWithMockData
 import com.vecinapp.ui.screen.HomeScreen
 import com.vecinapp.ui.screen.LoginScreen
+import com.vecinapp.ui.screen.NotificationScreen
 import com.vecinapp.ui.screen.OtpVerificationScreen
 import com.vecinapp.ui.screen.ProfileCompletionScreen
 import com.vecinapp.ui.screen.RegisterScreenMobile
@@ -42,25 +42,32 @@ fun VecinalNavHost(
     val authManager = remember { AuthManager(context) }
     val prefs = remember { PreferencesManager(context) }
     val snackbar = remember { SnackbarHostState() }
+    val loading = remember { mutableStateOf(false) }
 
     /* 2.  cálculo FINITO del destino -------------------- */
+    /* -------- user (Flow) -------- */
+    val firebaseUser by authManager
+        .currentUser
+        .collectAsState(initial = null)             // <FirebaseUser?>
 
-
-    val user by authManager.currentUser.collectAsState(null)
-
-    // produceState ES suspend -> aquí sí se puede llamar a funciones suspend
-    val profile by produceState<UserProfile?>(null, user?.uid) {
-        value = user?.let { authManager.getUserProfile(it.uid) }      // 1 sola query
+    /* -------- perfil (query 1-shot) -------- */
+    val profile by produceState<UserProfile?>(initialValue = null, key1 = firebaseUser?.uid) {
+        value = firebaseUser?.uid?.let { uid ->
+            authManager.getUserProfile(uid)          // ← función suspend
+        }
+        // Si firebaseUser == null  ⇒  value sigue siendo null
     }
 
-    /* -------- 3. pantalla inicial -------- */
-    val start = remember(user, profile) {
+    /* -------- pantalla inicial -------- */
+    val start = remember(firebaseUser, profile) {
         when {
-            user == null -> ScreenLogin/* user.phoneNumber == null      -> ScreenRegisterPhone  // si lo necesitas */
+            firebaseUser == null -> ScreenLogin
+            profile == null -> ScreenSplash           // aún cargando
             profile?.isProfileComplete != true -> ScreenProfileCompletion
             else -> ScreenHome
         }
     }
+
 
     /* -------- 4. UI -------- */
     Scaffold(
@@ -175,7 +182,7 @@ fun VecinalNavHost(
 
             /*--------------- Notifications --------------- */
             composable<ScreenNotifications> {
-                Text("Notifications")
+                NotificationScreen()
             }
 
 

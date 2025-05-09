@@ -79,7 +79,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.firebase.Timestamp
 import com.vecinapp.auth.AuthManager
-import com.vecinapp.auth.UserProfile
 import com.vecinapp.domain.model.Community
 import com.vecinapp.domain.model.Event
 import com.vecinapp.domain.model.Proposal
@@ -206,24 +205,17 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
 
-                        // Obtener el usuario actual
-                        val firebaseUserState =
-                            authManager.currentUser.collectAsState(initial = null)
-                        val firebaseUser = firebaseUserState.value
+                        /* ---------- 1. usuario Firebase ---------- */
+                        val firebaseUser by authManager
+                            .currentUser
+                            .collectAsState(initial = null)          // <FirebaseUser?>
 
-// Obtener el perfil del usuario si el uid es válido
-                        val profileState = if (firebaseUser != null) {
-                            authManager.profile.collectAsState(initial = null)
-                        } else {
-                            remember { mutableStateOf<UserProfile?>(null) }
-                        }
-                        val profile = profileState.value
 
-// Mostrar nombre del usuario si está disponible, o "Vecino" por defecto
-                        val nombre = profile?.displayName ?: "Vecino"
-
+                        /* ---------- 3. elegir nombre ---------- */
+                        val nombre = firebaseUser?.displayName
+                            ?: "Vecino"
                         Text(
-                            text = "¡Hola, $nombre!",
+                            text = "¡Hola, ${nombre}!",
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -1396,3 +1388,4 @@ data class Notification(
 enum class NotificationType {
     EVENT, COMMUNITY, PROPOSAL, SYSTEM
 }
+
