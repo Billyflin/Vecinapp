@@ -1,4 +1,4 @@
-name: Android CI/CD with ClickUp Integration
+name: Vecinapp CI/CD with ClickUp Integration
 
 on:
   push:
@@ -7,21 +7,19 @@ on:
     types: [ opened, closed, merged ]
   issues:
     types: [ opened, closed, reopened, assigned ]
-  # Programar informes semanales
   schedule:
-    - cron: '0 9 * * MON'  # Cada lunes a las 9:00
+    - cron: '0 9 * * MON'  # Reporte semanal cada lunes
 
 jobs:
-  # JOB 1: Integración con ClickUp para eventos de código
+  # JOB 1: Integración con ClickUp
   update-clickup:
     runs-on: ubuntu-latest
-    # No ejecutar para el informe semanal programado
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Obtener todo el historial para análisis
+          fetch-depth: 0
 
       - name: Get commit details
         id: commit-details
@@ -34,65 +32,64 @@ jobs:
           echo "lines_added=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$1} END {print sum}')" >> $GITHUB_OUTPUT
           echo "lines_removed=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$2} END {print sum}')" >> $GITHUB_OUTPUT
 
-      - name: Determine Android components changed
-        id: android-components
+      - name: Determine Vecinapp components changed
+        id: vecinapp-components
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
-          # Detectar componentes Android modificados
-          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/java/.*Activity\.kt"; then
-            echo "activities_changed=true" >> $GITHUB_OUTPUT
+          # Detectar componentes específicos de Vecinapp
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "MainActivity.kt\|VecinalNavHost.kt"; then
+            echo "core_changed=true" >> $GITHUB_OUTPUT
           fi
-          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/java/.*Fragment\.kt"; then
-            echo "fragments_changed=true" >> $GITHUB_OUTPUT
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Authentication"; then
+            echo "auth_changed=true" >> $GITHUB_OUTPUT
           fi
-          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/res/layout/"; then
-            echo "layouts_changed=true" >> $GITHUB_OUTPUT
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Navigation"; then
+            echo "navigation_changed=true" >> $GITHUB_OUTPUT
           fi
-          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/build.gradle"; then
-            echo "dependencies_changed=true" >> $GITHUB_OUTPUT
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Firebase"; then
+            echo "firebase_changed=true" >> $GITHUB_OUTPUT
           fi
-          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/AndroidManifest.xml"; then
-            echo "manifest_changed=true" >> $GITHUB_OUTPUT
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "UI\|Components"; then
+            echo "ui_changed=true" >> $GITHUB_OUTPUT
           fi
 
       - name: Create or update ClickUp task
         run: |
           # Determinar el título, descripción y estado según el tipo de evento
           if [ "${{ github.event_name }}" == "push" ]; then
-            # Determinar el tipo de cambio para Android
-            ANDROID_CHANGES=""
-            if [ "${{ steps.android-components.outputs.activities_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Activities"
+            # Determinar el tipo de cambio para Vecinapp
+            VECINAPP_CHANGES=""
+            if [ "${{ steps.vecinapp-components.outputs.core_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Modificación de componentes core"
             fi
-            if [ "${{ steps.android-components.outputs.fragments_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Fragments"
+            if [ "${{ steps.vecinapp-components.outputs.auth_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en autenticación"
             fi
-            if [ "${{ steps.android-components.outputs.layouts_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en layouts XML"
+            if [ "${{ steps.vecinapp-components.outputs.navigation_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en navegación"
             fi
-            if [ "${{ steps.android-components.outputs.dependencies_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Actualización de dependencias"
+            if [ "${{ steps.vecinapp-components.outputs.firebase_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Integración con Firebase"
             fi
-            if [ "${{ steps.android-components.outputs.manifest_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en AndroidManifest"
+            if [ "${{ steps.vecinapp-components.outputs.ui_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Componentes de UI"
             fi
           
             # Si no se detectaron cambios específicos
-            if [ -z "$ANDROID_CHANGES" ]; then
-              ANDROID_CHANGES="\n- Otros cambios en el código"
+            if [ -z "$VECINAPP_CHANGES" ]; then
+              VECINAPP_CHANGES="\\n- Otros cambios en el código"
             fi
           
-            TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:50}"
             COMMIT_MSG="${{ steps.commit-details.outputs.message }}"
             if [ ${#COMMIT_MSG} -gt 50 ]; then
-              TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:47}..."
+              TITLE="[Vecinapp] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:47}..."
             else
-              TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: $COMMIT_MSG"
+              TITLE="[Vecinapp] Commit en ${{ steps.commit-details.outputs.branch }}: $COMMIT_MSG"
             fi
           
-            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\n**Autor:** ${{ steps.commit-details.outputs.author }}\n**Branch:** ${{ steps.commit-details.outputs.branch }}\n**Repo:** Vecinapp\n\n**Cambios:**$ANDROID_CHANGES\n\n**Estadísticas:**\n- Archivos modificados: ${{ steps.commit-details.outputs.files_changed }}\n- Líneas añadidas: ${{ steps.commit-details.outputs.lines_added }}\n- Líneas eliminadas: ${{ steps.commit-details.outputs.lines_removed }}\n\n**Link:** https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\\n**Autor:** ${{ steps.commit-details.outputs.author }}\\n**Branch:** ${{ steps.commit-details.outputs.branch }}\\n**Repo:** Vecinapp\\n\\n**Componentes modificados:**$VECINAPP_CHANGES\\n\\n**Estadísticas:**\\n- Archivos modificados: ${{ steps.commit-details.outputs.files_changed }}\\n- Líneas añadidas: ${{ steps.commit-details.outputs.lines_added }}\\n- Líneas eliminadas: ${{ steps.commit-details.outputs.lines_removed }}\\n\\n**Link:** https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
             STATUS="in progress"
-            TAGS='["android", "commit", "${{ steps.commit-details.outputs.branch }}"]'
+            TAGS='["vecinapp", "commit", "${{ steps.commit-details.outputs.branch }}"]'
           
             # Determinar prioridad basada en el mensaje del commit
             if echo "${{ steps.commit-details.outputs.message }}" | grep -qi "fix\|bug\|error\|crash\|ANR"; then
@@ -113,53 +110,53 @@ jobs:
             fi
           
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            # Determinar componentes Android para PRs
-            ANDROID_CHANGES=""
-            if [ "${{ steps.android-components.outputs.activities_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Activities"
+            # Determinar componentes de Vecinapp para PRs
+            VECINAPP_CHANGES=""
+            if [ "${{ steps.vecinapp-components.outputs.core_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Modificación de componentes core"
             fi
-            if [ "${{ steps.android-components.outputs.fragments_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Fragments"
+            if [ "${{ steps.vecinapp-components.outputs.auth_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en autenticación"
             fi
-            if [ "${{ steps.android-components.outputs.layouts_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en layouts XML"
+            if [ "${{ steps.vecinapp-components.outputs.navigation_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en navegación"
             fi
-            if [ "${{ steps.android-components.outputs.dependencies_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Actualización de dependencias"
+            if [ "${{ steps.vecinapp-components.outputs.firebase_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Integración con Firebase"
             fi
-            if [ "${{ steps.android-components.outputs.manifest_changed }}" == "true" ]; then
-              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en AndroidManifest"
+            if [ "${{ steps.vecinapp-components.outputs.ui_changed }}" == "true" ]; then
+              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Componentes de UI"
             fi
           
             # Si no se detectaron cambios específicos
-            if [ -z "$ANDROID_CHANGES" ]; then
-              ANDROID_CHANGES="\n- Otros cambios en el código"
+            if [ -z "$VECINAPP_CHANGES" ]; then
+              VECINAPP_CHANGES="\\n- Otros cambios en el código"
             fi
           
-            TITLE="[Android] PR: ${{ github.event.pull_request.title }}"
-            DESC="**PR:** ${{ github.event.pull_request.title }}\n**Autor:** ${{ github.event.pull_request.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp\n\n**Componentes modificados:**$ANDROID_CHANGES\n\n**Link:** ${{ github.event.pull_request.html_url }}"
+            TITLE="[Vecinapp] PR: ${{ github.event.pull_request.title }}"
+            DESC="**PR:** ${{ github.event.pull_request.title }}\\n**Autor:** ${{ github.event.pull_request.user.login }}\\n**Estado:** ${{ github.event.action }}\\n**Repo:** Vecinapp\\n\\n**Componentes modificados:**$VECINAPP_CHANGES\\n\\n**Link:** ${{ github.event.pull_request.html_url }}"
           
             if [ "${{ github.event.action }}" == "opened" ]; then
               STATUS="to do"
             elif [ "${{ github.event.action }}" == "closed" ]; then
               if [ "${{ github.event.pull_request.merged }}" == "true" ]; then
                 STATUS="complete"
-                DESC="$DESC\n\n**Merged:** ✅"
+                DESC="$DESC\\n\\n**Merged:** ✅"
               else
                 STATUS="closed"
-                DESC="$DESC\n\n**Merged:** ❌"
+                DESC="$DESC\\n\\n**Merged:** ❌"
               fi
             else
               STATUS="in progress"
             fi
           
-            TAGS='["android", "pull-request", "${{ github.event.action }}"]'
+            TAGS='["vecinapp", "pull-request", "${{ github.event.action }}"]'
             PRIORITY=2  # Alta para PRs
             TIME_ESTIMATE=21600000  # 6 horas en ms para revisar PRs
           
           elif [ "${{ github.event_name }}" == "issues" ]; then
-            TITLE="[Android] Issue: ${{ github.event.issue.title }}"
-            DESC="**Issue:** ${{ github.event.issue.title }}\n**Autor:** ${{ github.event.issue.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp\n\n**Descripción:**\n${{ github.event.issue.body }}\n\n**Link:** ${{ github.event.issue.html_url }}"
+            TITLE="[Vecinapp] Issue: ${{ github.event.issue.title }}"
+            DESC="**Issue:** ${{ github.event.issue.title }}\\n**Autor:** ${{ github.event.issue.user.login }}\\n**Estado:** ${{ github.event.action }}\\n**Repo:** Vecinapp\\n\\n**Descripción:**\\n${{ github.event.issue.body }}\\n\\n**Link:** ${{ github.event.issue.html_url }}"
           
             if [ "${{ github.event.action }}" == "opened" ]; then
               STATUS="to do"
@@ -173,19 +170,19 @@ jobs:
           
             # Determinar si es un bug o feature request basado en etiquetas o título
             if echo "${{ toJson(github.event.issue.labels) }}" | grep -qi "bug" || echo "${{ github.event.issue.title }}" | grep -qi "bug\|error\|crash\|fallo"; then
-              TAGS='["android", "issue", "bug"]'
+              TAGS='["vecinapp", "issue", "bug"]'
               PRIORITY=1  # Urgente para bugs
             else
-              TAGS='["android", "issue", "enhancement"]'
+              TAGS='["vecinapp", "issue", "enhancement"]'
               PRIORITY=3  # Normal para features
             fi
           
             TIME_ESTIMATE=18000000  # 5 horas en ms para issues
           else
-            TITLE="[Android] Evento: ${{ github.event_name }}"
-            DESC="**Evento:** ${{ github.event_name }}\n**Actor:** ${{ github.actor }}\n**Repo:** Vecinapp"
+            TITLE="[Vecinapp] Evento: ${{ github.event_name }}"
+            DESC="**Evento:** ${{ github.event_name }}\\n**Actor:** ${{ github.actor }}\\n**Repo:** Vecinapp"
             STATUS="to do"
-            TAGS='["android", "other"]'
+            TAGS='["vecinapp", "other"]'
             PRIORITY=3
             TIME_ESTIMATE=7200000  # 2 horas en ms
           fi
@@ -250,10 +247,9 @@ jobs:
               }"
           fi
 
-  # JOB 2: Compilar y probar la aplicación Android
+  # JOB 2: Compilar y probar Vecinapp
   build-and-test:
     runs-on: ubuntu-latest
-    # No ejecutar para el informe semanal programado
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -281,10 +277,14 @@ jobs:
         run: ./gradlew testDebug
         continue-on-error: true
 
-      - name: Run lint
-        id: lint
-        run: ./gradlew lintDebug
-        continue-on-error: true
+      - name: Check Firebase configuration
+        id: firebase
+        run: |
+          if [ -f "app/google-services.json" ]; then
+            echo "firebase_config=✅ Configuración de Firebase presente" >> $GITHUB_OUTPUT
+          else
+            echo "firebase_config=⚠️ Falta archivo google-services.json" >> $GITHUB_OUTPUT
+          fi
 
       - name: Update ClickUp with build results
         run: |
@@ -302,20 +302,13 @@ jobs:
             TEST_STATUS="❌ Tests fallidos"
           fi
           
-          # Determinar resultado del lint
-          if [ "${{ steps.lint.outcome }}" == "success" ]; then
-            LINT_STATUS="✅ Lint exitoso"
-          else
-            LINT_STATUS="⚠️ Advertencias de lint"
-          fi
-          
           # Buscar la tarea más reciente relacionada con este commit/PR
           if [ "${{ github.event_name }}" == "push" ]; then
-            SEARCH_TERM="[Android] Commit en ${GITHUB_REF#refs/heads/}"
+            SEARCH_TERM="[Vecinapp] Commit en ${GITHUB_REF#refs/heads/}"
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            SEARCH_TERM="[Android] PR: ${{ github.event.pull_request.title }}"
+            SEARCH_TERM="[Vecinapp] PR: ${{ github.event.pull_request.title }}"
           else
-            SEARCH_TERM="[Android]"
+            SEARCH_TERM="[Vecinapp]"
           fi
           
           TASK_ID=$(curl -s -G "https://api.clickup.com/api/v2/list/901312972197/task" \
@@ -329,7 +322,7 @@ jobs:
               -H "Content-Type: application/json" \
               -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
               -d "{
-                \"comment_text\": \"### Resultados de CI/CD\\n\\n$BUILD_STATUS\\n$TEST_STATUS\\n$LINT_STATUS\\n\\nEjecutado: $(date)\",
+                \"comment_text\": \"### Resultados de CI/CD\\n\\n$BUILD_STATUS\\n$TEST_STATUS\\n${{ steps.firebase.outputs.firebase_config }}\\n\\nEjecutado: $(date)\",
                 \"notify_all\": true
               }"
           
@@ -354,7 +347,7 @@ jobs:
         with:
           fetch-depth: 0  # Obtener todo el historial
 
-      - name: Generate Android development stats
+      - name: Generate Vecinapp development stats
         id: stats
         run: |
           # Obtener estadísticas de la semana anterior
@@ -362,17 +355,19 @@ jobs:
           AUTHORS=$(git log --since="1 week ago" --format="%an" | sort -u | wc -l)
           FILES=$(git log --since="1 week ago" --name-only --pretty=format: | sort -u | wc -l)
           
-          # Estadísticas específicas de Android
-          ACTIVITIES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Activity.kt")
-          FRAGMENTS=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Fragment.kt")
-          LAYOUTS=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "res/layout/")
+          # Estadísticas específicas de Vecinapp
+          AUTH_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Authentication")
+          NAV_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Navigation")
+          FIREBASE_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Firebase")
+          UI_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "UI\|Components")
           
           echo "commits=$COMMITS" >> $GITHUB_OUTPUT
           echo "authors=$AUTHORS" >> $GITHUB_OUTPUT
           echo "files=$FILES" >> $GITHUB_OUTPUT
-          echo "activities=$ACTIVITIES" >> $GITHUB_OUTPUT
-          echo "fragments=$FRAGMENTS" >> $GITHUB_OUTPUT
-          echo "layouts=$LAYOUTS" >> $GITHUB_OUTPUT
+          echo "auth_changes=$AUTH_CHANGES" >> $GITHUB_OUTPUT
+          echo "nav_changes=$NAV_CHANGES" >> $GITHUB_OUTPUT
+          echo "firebase_changes=$FIREBASE_CHANGES" >> $GITHUB_OUTPUT
+          echo "ui_changes=$UI_CHANGES" >> $GITHUB_OUTPUT
           
           # Obtener los principales contribuidores
           TOP_CONTRIBUTORS=$(git log --since="1 week ago" --format="%an" | sort | uniq -c | sort -nr | head -5 | awk '{print "- " $2 " " $3 ": " $1 " commits"}')
@@ -389,10 +384,10 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
             -d "{
-              \"name\": \"Reporte Semanal Android: $START_DATE a $REPORT_DATE\",
-              \"description\": \"## Reporte de Desarrollo Android Semanal\\n\\n**Periodo:** $START_DATE a $REPORT_DATE\\n\\n### Estadísticas\\n- **Commits:** ${{ steps.stats.outputs.commits }}\\n- **Desarrolladores activos:** ${{ steps.stats.outputs.authors }}\\n- **Archivos modificados:** ${{ steps.stats.outputs.files }}\\n\\n### Componentes Android\\n- **Activities modificadas:** ${{ steps.stats.outputs.activities }}\\n- **Fragments modificados:** ${{ steps.stats.outputs.fragments }}\\n- **Layouts XML modificados:** ${{ steps.stats.outputs.layouts }}\\n\\n### Principales contribuidores\\n${{ steps.stats.outputs.top_contributors }}\",
+              \"name\": \"📊 Reporte Semanal Vecinapp: $START_DATE a $REPORT_DATE\",
+              \"description\": \"## Reporte de Desarrollo Vecinapp Semanal\\n\\n**Periodo:** $START_DATE a $REPORT_DATE\\n\\n### Estadísticas\\n- **Commits:** ${{ steps.stats.outputs.commits }}\\n- **Desarrolladores activos:** ${{ steps.stats.outputs.authors }}\\n- **Archivos modificados:** ${{ steps.stats.outputs.files }}\\n\\n### Componentes Vecinapp\\n- **Cambios en autenticación:** ${{ steps.stats.outputs.auth_changes }}\\n- **Cambios en navegación:** ${{ steps.stats.outputs.nav_changes }}\\n- **Cambios en Firebase:** ${{ steps.stats.outputs.firebase_changes }}\\n- **Cambios en UI:** ${{ steps.stats.outputs.ui_changes }}\\n\\n### Principales contribuidores\\n${{ steps.stats.outputs.top_contributors }}\",
               \"status\": \"complete\",
-              \"tags\": [\"reporte\", \"semanal\", \"android\"],
+              \"tags\": [\"reporte\", \"semanal\", \"vecinapp\"],
               \"priority\": 3,
               \"notify_all\": true
             }"
