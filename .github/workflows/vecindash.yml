@@ -1,19 +1,123 @@
-name: Vecinapp CI/CD with ClickUp Integration
+name: Vecinapp CI/CD with Enhanced ClickUp Integration
 
 on:
   push:
-    branches: [ main, develop, feature/*, release/* ]
+    branches: [ main, develop, feature/*, release/*, hotfix/* ]
   pull_request:
-    types: [ opened, closed, merged ]
+    types: [ opened, closed, merged, synchronize, reopened ]
   issues:
-    types: [ opened, closed, reopened, assigned ]
+    types: [ opened, closed, reopened, assigned, labeled ]
   schedule:
     - cron: '0 9 * * MON'  # Reporte semanal cada lunes
+    - cron: '0 12 * * FRI'  # Reporte de fin de semana cada viernes
 
 jobs:
-  # JOB 1: Integración con ClickUp
-  update-clickup:
+  # JOB 1: Análisis de código y calidad
+  analyze-code:
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    outputs:
+      code_quality: ${{ steps.code-quality.outputs.result }}
+      complexity: ${{ steps.complexity.outputs.result }}
+      tech_debt: ${{ steps.tech-debt.outputs.result }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Analyze code quality
+        id: code-quality
+        run: |
+          # Análisis básico de calidad de código
+          KOTLIN_FILES=$(find . -name "*.kt" | wc -l)
+          XML_FILES=$(find . -name "*.xml" | wc -l)
+          
+          # Detectar code smells básicos
+          LONG_METHODS=$(grep -r "fun " --include="*.kt" . | awk '{print length}' | awk '$1 > 100' | wc -l)
+          LARGE_CLASSES=$(grep -r "class " --include="*.kt" . | awk '{print length}' | awk '$1 > 500' | wc -l)
+          
+          # Calcular puntuación básica de calidad (0-100)
+          if [ $KOTLIN_FILES -gt 0 ]; then
+            QUALITY_SCORE=$((100 - ($LONG_METHODS + $LARGE_CLASSES) * 5))
+            if [ $QUALITY_SCORE -lt 0 ]; then
+              QUALITY_SCORE=0
+            fi
+          else
+            QUALITY_SCORE=100
+          fi
+          
+          # Determinar nivel de calidad
+          if [ $QUALITY_SCORE -ge 90 ]; then
+            QUALITY_LEVEL="🟢 Excelente"
+          elif [ $QUALITY_SCORE -ge 70 ]; then
+            QUALITY_LEVEL="🟡 Buena"
+          elif [ $QUALITY_SCORE -ge 50 ]; then
+            QUALITY_LEVEL="🟠 Regular"
+          else
+            QUALITY_LEVEL="🔴 Necesita mejoras"
+          fi
+          
+          echo "result=$QUALITY_LEVEL ($QUALITY_SCORE/100)" >> $GITHUB_OUTPUT
+
+      - name: Analyze code complexity
+        id: complexity
+        run: |
+          # Análisis básico de complejidad
+          TOTAL_LINES=$(find . -name "*.kt" -o -name "*.java" | xargs cat | wc -l)
+          COMMENT_LINES=$(find . -name "*.kt" -o -name "*.java" | xargs grep -c "//\|/\*\|\*/\|^\s*\*" || echo 0)
+          
+          # Calcular ratio de comentarios
+          if [ $TOTAL_LINES -gt 0 ]; then
+            COMMENT_RATIO=$(( $COMMENT_LINES * 100 / $TOTAL_LINES ))
+          else
+            COMMENT_RATIO=0
+          fi
+          
+          # Determinar nivel de complejidad
+          if [ $COMMENT_RATIO -lt 10 ]; then
+            COMPLEXITY_LEVEL="🔴 Alta (pocos comentarios)"
+          elif [ $COMMENT_RATIO -lt 20 ]; then
+            COMPLEXITY_LEVEL="🟠 Media"
+          else
+            COMPLEXITY_LEVEL="🟢 Baja (bien documentado)"
+          fi
+          
+          echo "result=$COMPLEXITY_LEVEL ($COMMENT_RATIO% comentado)" >> $GITHUB_OUTPUT
+
+      - name: Analyze technical debt
+        id: tech-debt
+        run: |
+          # Buscar indicadores de deuda técnica
+          TODO_COUNT=$(grep -r "TODO\|FIXME" --include="*.kt" --include="*.java" . | wc -l)
+          DEPRECATED_COUNT=$(grep -r "@Deprecated" --include="*.kt" --include="*.java" . | wc -l)
+          
+          # Calcular puntuación de deuda técnica
+          TECH_DEBT_SCORE=$(( $TODO_COUNT + $DEPRECATED_COUNT ))
+          
+          # Determinar nivel de deuda técnica
+          if [ $TECH_DEBT_SCORE -eq 0 ]; then
+            TECH_DEBT_LEVEL="🟢 Sin deuda técnica visible"
+          elif [ $TECH_DEBT_SCORE -lt 5 ]; then
+            TECH_DEBT_LEVEL="🟡 Deuda técnica baja"
+          elif [ $TECH_DEBT_SCORE -lt 15 ]; then
+            TECH_DEBT_LEVEL="🟠 Deuda técnica moderada"
+          else
+            TECH_DEBT_LEVEL="🔴 Deuda técnica alta"
+          fi
+          
+          echo "result=$TECH_DEBT_LEVEL ($TECH_DEBT_SCORE items)" >> $GITHUB_OUTPUT
+
+  # JOB 2: Integración mejorada con ClickUp
+  enhanced-clickup-integration:
+    runs-on: ubuntu-latest
+    needs: analyze-code
     if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
@@ -27,160 +131,307 @@ jobs:
         run: |
           echo "message=$(git log -1 --pretty=format:%s)" >> $GITHUB_OUTPUT
           echo "author=$(git log -1 --pretty=format:%an)" >> $GITHUB_OUTPUT
+          echo "email=$(git log -1 --pretty=format:%ae)" >> $GITHUB_OUTPUT
           echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
           echo "files_changed=$(git diff --name-only HEAD^ HEAD | wc -l)" >> $GITHUB_OUTPUT
           echo "lines_added=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$1} END {print sum}')" >> $GITHUB_OUTPUT
           echo "lines_removed=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$2} END {print sum}')" >> $GITHUB_OUTPUT
+          echo "commit_time=$(git log -1 --pretty=format:%ci)" >> $GITHUB_OUTPUT
+          
+          # Determinar tipo de commit basado en el mensaje
+          if echo "${{ github.event.head_commit.message }}" | grep -qi "^feat\|^feature\|nueva funcionalidad"; then
+            echo "commit_type=✨ Feature" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^fix\|^bug\|^error\|^crash"; then
+            echo "commit_type=🐛 Fix" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^docs\|documentación\|^doc"; then
+            echo "commit_type=📚 Docs" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^style\|^formato\|^ui"; then
+            echo "commit_type=💄 Style" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^refactor\|^refactorización"; then
+            echo "commit_type=♻️ Refactor" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^test\|^prueba"; then
+            echo "commit_type=🧪 Test" >> $GITHUB_OUTPUT
+          elif echo "${{ github.event.head_commit.message }}" | grep -qi "^chore\|^build\|^ci"; then
+            echo "commit_type=🔧 Chore" >> $GITHUB_OUTPUT
+          else
+            echo "commit_type=🔄 Update" >> $GITHUB_OUTPUT
+          fi
 
       - name: Determine Vecinapp components changed
         id: vecinapp-components
         if: github.event_name == 'push' || github.event_name == 'pull_request'
         run: |
           # Detectar componentes específicos de Vecinapp
+          COMPONENTS=""
+          ASSIGNEE_ID="null"
+          
           if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "MainActivity.kt\|VecinalNavHost.kt"; then
-            echo "core_changed=true" >> $GITHUB_OUTPUT
+            COMPONENTS="$COMPONENTS\n- 🏗️ Componentes core"
+            # Asignar al responsable de arquitectura
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
           fi
+          
           if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Authentication"; then
-            echo "auth_changed=true" >> $GITHUB_OUTPUT
+            COMPONENTS="$COMPONENTS\n- 🔐 Sistema de autenticación"
+            # Asignar al responsable de seguridad
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
           fi
+          
           if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Navigation"; then
-            echo "navigation_changed=true" >> $GITHUB_OUTPUT
+            COMPONENTS="$COMPONENTS\n- 🧭 Sistema de navegación"
+            # Asignar al responsable de UX
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
           fi
+          
           if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Firebase"; then
-            echo "firebase_changed=true" >> $GITHUB_OUTPUT
+            COMPONENTS="$COMPONENTS\n- 🔥 Integración con Firebase"
+            # Asignar al responsable de backend
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
           fi
+          
           if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "UI\|Components"; then
-            echo "ui_changed=true" >> $GITHUB_OUTPUT
+            COMPONENTS="$COMPONENTS\n- 🎨 Componentes de UI"
+            # Asignar al responsable de UI
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
           fi
+          
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Model\|Data"; then
+            COMPONENTS="$COMPONENTS\n- 💾 Modelo de datos"
+            # Asignar al responsable de datos
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
+          fi
+          
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "Test"; then
+            COMPONENTS="$COMPONENTS\n- 🧪 Tests"
+            # Asignar al responsable de QA
+            ASSIGNEE_ID="null"  # Reemplazar con ID real
+          fi
+          
+          # Si no se detectaron cambios específicos
+          if [ -z "$COMPONENTS" ]; then
+            COMPONENTS="\n- 🔄 Otros cambios en el código"
+          fi
+          
+          echo "components=$COMPONENTS" >> $GITHUB_OUTPUT
+          echo "assignee_id=$ASSIGNEE_ID" >> $GITHUB_OUTPUT
 
       - name: Create or update ClickUp task
         run: |
           # Determinar el título, descripción y estado según el tipo de evento
           if [ "${{ github.event_name }}" == "push" ]; then
-            # Determinar el tipo de cambio para Vecinapp
-            VECINAPP_CHANGES=""
-            if [ "${{ steps.vecinapp-components.outputs.core_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Modificación de componentes core"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.auth_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en autenticación"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.navigation_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en navegación"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.firebase_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Integración con Firebase"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.ui_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Componentes de UI"
-            fi
-          
-            # Si no se detectaron cambios específicos
-            if [ -z "$VECINAPP_CHANGES" ]; then
-              VECINAPP_CHANGES="\\n- Otros cambios en el código"
-            fi
-          
+            # Formatear título según tipo de commit
+            COMMIT_TYPE="${{ steps.commit-details.outputs.commit_type }}"
             COMMIT_MSG="${{ steps.commit-details.outputs.message }}"
+            BRANCH="${{ steps.commit-details.outputs.branch }}"
+          
             if [ ${#COMMIT_MSG} -gt 50 ]; then
-              TITLE="[Vecinapp] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:47}..."
+              TITLE="[Vecinapp] $COMMIT_TYPE en $BRANCH: ${COMMIT_MSG:0:47}..."
             else
-              TITLE="[Vecinapp] Commit en ${{ steps.commit-details.outputs.branch }}: $COMMIT_MSG"
+              TITLE="[Vecinapp] $COMMIT_TYPE en $BRANCH: $COMMIT_MSG"
             fi
           
-            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\\n**Autor:** ${{ steps.commit-details.outputs.author }}\\n**Branch:** ${{ steps.commit-details.outputs.branch }}\\n**Repo:** Vecinapp\\n\\n**Componentes modificados:**$VECINAPP_CHANGES\\n\\n**Estadísticas:**\\n- Archivos modificados: ${{ steps.commit-details.outputs.files_changed }}\\n- Líneas añadidas: ${{ steps.commit-details.outputs.lines_added }}\\n- Líneas eliminadas: ${{ steps.commit-details.outputs.lines_removed }}\\n\\n**Link:** https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+            # Crear descripción enriquecida
+            DESC="## 📝 Detalles del Commit\\n\\n"
+            DESC="${DESC}**🔤 Commit:** ${{ steps.commit-details.outputs.message }}\\n"
+            DESC="${DESC}**👤 Autor:** ${{ steps.commit-details.outputs.author }} (${{ steps.commit-details.outputs.email }})\\n"
+            DESC="${DESC}**🌿 Branch:** ${{ steps.commit-details.outputs.branch }}\\n"
+            DESC="${DESC}**🏢 Repo:** Vecinapp\\n"
+            DESC="${DESC}**⏰ Fecha:** ${{ steps.commit-details.outputs.commit_time }}\\n\\n"
+          
+            DESC="${DESC}## 🧩 Componentes modificados\\n${{ steps.vecinapp-components.outputs.components }}\\n\\n"
+          
+            DESC="${DESC}## 📊 Estadísticas\\n\\n"
+            DESC="${DESC}- **📁 Archivos modificados:** ${{ steps.commit-details.outputs.files_changed }}\\n"
+            DESC="${DESC}- **➕ Líneas añadidas:** ${{ steps.commit-details.outputs.lines_added }}\\n"
+            DESC="${DESC}- **➖ Líneas eliminadas:** ${{ steps.commit-details.outputs.lines_removed }}\\n\\n"
+          
+            DESC="${DESC}## 🔍 Análisis de código\\n\\n"
+            DESC="${DESC}- **🛡️ Calidad del código:** ${{ needs.analyze-code.outputs.code_quality }}\\n"
+            DESC="${DESC}- **🧠 Complejidad:** ${{ needs.analyze-code.outputs.complexity }}\\n"
+            DESC="${DESC}- **💸 Deuda técnica:** ${{ needs.analyze-code.outputs.tech_debt }}\\n\\n"
+          
+            DESC="${DESC}## 🔗 Enlaces\\n\\n"
+            DESC="${DESC}**📎 Commit:** [Ver en GitHub](https://github.com/${{ github.repository }}/commit/${{ github.sha }})\\n"
+            DESC="${DESC}**📊 CI/CD:** [Ver resultados](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          
             STATUS="in progress"
-            TAGS='["vecinapp", "commit", "${{ steps.commit-details.outputs.branch }}"]'
           
-            # Determinar prioridad basada en el mensaje del commit
-            if echo "${{ steps.commit-details.outputs.message }}" | grep -qi "fix\|bug\|error\|crash\|ANR"; then
-              PRIORITY=1  # Urgente
-            elif echo "${{ steps.commit-details.outputs.message }}" | grep -qi "feature\|feat"; then
-              PRIORITY=2  # Alta
+            # Determinar etiquetas según tipo de commit y branch
+            if [[ "$COMMIT_TYPE" == *"Feature"* ]]; then
+              TAGS='["vecinapp", "commit", "feature", "${{ steps.commit-details.outputs.branch }}"]'
+            elif [[ "$COMMIT_TYPE" == *"Fix"* ]]; then
+              TAGS='["vecinapp", "commit", "fix", "${{ steps.commit-details.outputs.branch }}"]'
+            elif [[ "$COMMIT_TYPE" == *"Refactor"* ]]; then
+              TAGS='["vecinapp", "commit", "refactor", "${{ steps.commit-details.outputs.branch }}"]'
             else
-              PRIORITY=3  # Normal
+              TAGS='["vecinapp", "commit", "${{ steps.commit-details.outputs.branch }}"]'
             fi
           
-            # Estimar tiempo basado en cambios
-            if [ ${{ steps.commit-details.outputs.files_changed }} -gt 10 ] || [ ${{ steps.commit-details.outputs.lines_added }} -gt 500 ]; then
-              TIME_ESTIMATE=28800000  # 8 horas en ms
-            elif [ ${{ steps.commit-details.outputs.files_changed }} -gt 5 ] || [ ${{ steps.commit-details.outputs.lines_added }} -gt 200 ]; then
-              TIME_ESTIMATE=14400000  # 4 horas en ms
+            # Determinar prioridad basada en el tipo de commit
+            if [[ "$COMMIT_TYPE" == *"Fix"* ]]; then
+              PRIORITY=1  # Urgente para fixes
+            elif [[ "$COMMIT_TYPE" == *"Feature"* ]]; then
+              PRIORITY=2  # Alta para features
             else
+              PRIORITY=3  # Normal para otros
+            fi
+          
+            # Estimar tiempo basado en cambios y complejidad
+            TOTAL_CHANGES=$(( ${{ steps.commit-details.outputs.lines_added }} + ${{ steps.commit-details.outputs.lines_removed }} ))
+          
+            if [ $TOTAL_CHANGES -gt 500 ]; then
+              TIME_ESTIMATE=28800000  # 8 horas en ms
+            elif [ $TOTAL_CHANGES -gt 200 ]; then
+              TIME_ESTIMATE=14400000  # 4 horas en ms
+            elif [ $TOTAL_CHANGES -gt 50 ]; then
               TIME_ESTIMATE=7200000   # 2 horas en ms
+            else
+              TIME_ESTIMATE=3600000   # 1 hora en ms
             fi
           
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            # Determinar componentes de Vecinapp para PRs
-            VECINAPP_CHANGES=""
-            if [ "${{ steps.vecinapp-components.outputs.core_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Modificación de componentes core"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.auth_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en autenticación"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.navigation_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Cambios en navegación"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.firebase_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Integración con Firebase"
-            fi
-            if [ "${{ steps.vecinapp-components.outputs.ui_changed }}" == "true" ]; then
-              VECINAPP_CHANGES="$VECINAPP_CHANGES\\n- Componentes de UI"
+            # Formatear título para PR
+            PR_TITLE="${{ github.event.pull_request.title }}"
+          
+            # Determinar tipo de PR
+            if echo "$PR_TITLE" | grep -qi "feature\|feat\|nueva"; then
+              PR_TYPE="✨ Feature"
+            elif echo "$PR_TITLE" | grep -qi "fix\|bug\|error\|crash"; then
+              PR_TYPE="🐛 Fix"
+            elif echo "$PR_TITLE" | grep -qi "refactor"; then
+              PR_TYPE="♻️ Refactor"
+            else
+              PR_TYPE="🔄 PR"
             fi
           
-            # Si no se detectaron cambios específicos
-            if [ -z "$VECINAPP_CHANGES" ]; then
-              VECINAPP_CHANGES="\\n- Otros cambios en el código"
+            TITLE="[Vecinapp] $PR_TYPE: $PR_TITLE"
+          
+            # Crear descripción enriquecida para PR
+            DESC="## 🔄 Detalles del Pull Request\\n\\n"
+            DESC="${DESC}**📝 Título:** ${{ github.event.pull_request.title }}\\n"
+            DESC="${DESC}**👤 Autor:** ${{ github.event.pull_request.user.login }}\\n"
+            DESC="${DESC}**🔄 Estado:** ${{ github.event.action }}\\n"
+            DESC="${DESC}**🏢 Repo:** Vecinapp\\n"
+          
+            if [ ! -z "${{ github.event.pull_request.body }}" ]; then
+              DESC="${DESC}\\n## 📄 Descripción del PR\\n\\n${{ github.event.pull_request.body }}\\n"
             fi
           
-            TITLE="[Vecinapp] PR: ${{ github.event.pull_request.title }}"
-            DESC="**PR:** ${{ github.event.pull_request.title }}\\n**Autor:** ${{ github.event.pull_request.user.login }}\\n**Estado:** ${{ github.event.action }}\\n**Repo:** Vecinapp\\n\\n**Componentes modificados:**$VECINAPP_CHANGES\\n\\n**Link:** ${{ github.event.pull_request.html_url }}"
+            DESC="${DESC}\\n## 🧩 Componentes modificados\\n${{ steps.vecinapp-components.outputs.components }}\\n\\n"
           
-            if [ "${{ github.event.action }}" == "opened" ]; then
+            DESC="${DESC}## 🔍 Análisis de código\\n\\n"
+            DESC="${DESC}- **🛡️ Calidad del código:** ${{ needs.analyze-code.outputs.code_quality }}\\n"
+            DESC="${DESC}- **🧠 Complejidad:** ${{ needs.analyze-code.outputs.complexity }}\\n"
+            DESC="${DESC}- **💸 Deuda técnica:** ${{ needs.analyze-code.outputs.tech_debt }}\\n\\n"
+          
+            DESC="${DESC}## 🔗 Enlaces\\n\\n"
+            DESC="${DESC}**📎 Pull Request:** [Ver en GitHub](${{ github.event.pull_request.html_url }})\\n"
+            DESC="${DESC}**📊 CI/CD:** [Ver resultados](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          
+            # Determinar estado según acción del PR
+            if [ "${{ github.event.action }}" == "opened" ] || [ "${{ github.event.action }}" == "reopened" ]; then
               STATUS="to do"
+            elif [ "${{ github.event.action }}" == "synchronize" ]; then
+              STATUS="in progress"
             elif [ "${{ github.event.action }}" == "closed" ]; then
               if [ "${{ github.event.pull_request.merged }}" == "true" ]; then
                 STATUS="complete"
-                DESC="$DESC\\n\\n**Merged:** ✅"
+                DESC="${DESC}\\n\\n## ✅ Resultado\\n\\n**Merged:** ✅ PR fusionado exitosamente"
               else
                 STATUS="closed"
-                DESC="$DESC\\n\\n**Merged:** ❌"
+                DESC="${DESC}\\n\\n## ❌ Resultado\\n\\n**Merged:** ❌ PR cerrado sin fusionar"
               fi
             else
               STATUS="in progress"
             fi
           
-            TAGS='["vecinapp", "pull-request", "${{ github.event.action }}"]'
-            PRIORITY=2  # Alta para PRs
-            TIME_ESTIMATE=21600000  # 6 horas en ms para revisar PRs
+            # Determinar etiquetas según tipo de PR
+            if echo "$PR_TITLE" | grep -qi "feature\|feat\|nueva"; then
+              TAGS='["vecinapp", "pull-request", "feature", "${{ github.event.action }}"]'
+            elif echo "$PR_TITLE" | grep -qi "fix\|bug\|error\|crash"; then
+              TAGS='["vecinapp", "pull-request", "fix", "${{ github.event.action }}"]'
+            elif echo "$PR_TITLE" | grep -qi "refactor"; then
+              TAGS='["vecinapp", "pull-request", "refactor", "${{ github.event.action }}"]'
+            else
+              TAGS='["vecinapp", "pull-request", "${{ github.event.action }}"]'
+            fi
+          
+            # Determinar prioridad según tipo de PR
+            if echo "$PR_TITLE" | grep -qi "fix\|bug\|error\|crash\|urgent"; then
+              PRIORITY=1  # Urgente para fixes
+            elif echo "$PR_TITLE" | grep -qi "feature\|feat\|nueva"; then
+              PRIORITY=2  # Alta para features
+            else
+              PRIORITY=3  # Normal para otros
+            fi
+          
+            # Tiempo estimado para revisión de PR
+            TIME_ESTIMATE=21600000  # 6 horas en ms
           
           elif [ "${{ github.event_name }}" == "issues" ]; then
-            TITLE="[Vecinapp] Issue: ${{ github.event.issue.title }}"
-            DESC="**Issue:** ${{ github.event.issue.title }}\\n**Autor:** ${{ github.event.issue.user.login }}\\n**Estado:** ${{ github.event.action }}\\n**Repo:** Vecinapp\\n\\n**Descripción:**\\n${{ github.event.issue.body }}\\n\\n**Link:** ${{ github.event.issue.html_url }}"
+            # Determinar tipo de issue
+            if echo "${{ github.event.issue.title }} ${{ toJson(github.event.issue.labels) }}" | grep -qi "bug\|error\|crash\|fallo"; then
+              ISSUE_TYPE="🐛 Bug"
+              PRIORITY=1  # Urgente para bugs
+              TAGS='["vecinapp", "issue", "bug", "${{ github.event.action }}"]'
+            elif echo "${{ github.event.issue.title }} ${{ toJson(github.event.issue.labels) }}" | grep -qi "feature\|enhancement\|mejora"; then
+              ISSUE_TYPE="✨ Feature"
+              PRIORITY=2  # Alta para features
+              TAGS='["vecinapp", "issue", "feature", "${{ github.event.action }}"]'
+            elif echo "${{ github.event.issue.title }} ${{ toJson(github.event.issue.labels) }}" | grep -qi "question\|pregunta\|duda"; then
+              ISSUE_TYPE="❓ Pregunta"
+              PRIORITY=3  # Normal para preguntas
+              TAGS='["vecinapp", "issue", "question", "${{ github.event.action }}"]'
+            else
+              ISSUE_TYPE="📋 Issue"
+              PRIORITY=3  # Normal para otros
+              TAGS='["vecinapp", "issue", "${{ github.event.action }}"]'
+            fi
           
-            if [ "${{ github.event.action }}" == "opened" ]; then
+            TITLE="[Vecinapp] $ISSUE_TYPE: ${{ github.event.issue.title }}"
+          
+            # Crear descripción enriquecida para issue
+            DESC="## 📋 Detalles del Issue\\n\\n"
+            DESC="${DESC}**📝 Título:** ${{ github.event.issue.title }}\\n"
+            DESC="${DESC}**👤 Reportado por:** ${{ github.event.issue.user.login }}\\n"
+            DESC="${DESC}**🔄 Estado:** ${{ github.event.action }}\\n"
+            DESC="${DESC}**🏢 Repo:** Vecinapp\\n"
+          
+            if [ ! -z "${{ github.event.issue.body }}" ]; then
+              DESC="${DESC}\\n## 📄 Descripción\\n\\n${{ github.event.issue.body }}\\n"
+            fi
+          
+            # Añadir etiquetas si existen
+            if [ ! -z "${{ toJson(github.event.issue.labels) }}" ] && [ "${{ toJson(github.event.issue.labels) }}" != "[]" ]; then
+              DESC="${DESC}\\n## 🏷️ Etiquetas\\n\\n${{ toJson(github.event.issue.labels) }}\\n"
+            fi
+          
+            DESC="${DESC}\\n## 🔗 Enlaces\\n\\n"
+            DESC="${DESC}**📎 Issue:** [Ver en GitHub](${{ github.event.issue.html_url }})"
+          
+            # Determinar estado según acción del issue
+            if [ "${{ github.event.action }}" == "opened" ] || [ "${{ github.event.action }}" == "reopened" ]; then
               STATUS="to do"
+            elif [ "${{ github.event.action }}" == "assigned" ]; then
+              STATUS="in progress"
             elif [ "${{ github.event.action }}" == "closed" ]; then
               STATUS="complete"
-            elif [ "${{ github.event.action }}" == "reopened" ]; then
-              STATUS="reopened"
             else
               STATUS="in progress"
             fi
           
-            # Determinar si es un bug o feature request basado en etiquetas o título
-            if echo "${{ toJson(github.event.issue.labels) }}" | grep -qi "bug" || echo "${{ github.event.issue.title }}" | grep -qi "bug\|error\|crash\|fallo"; then
-              TAGS='["vecinapp", "issue", "bug"]'
-              PRIORITY=1  # Urgente para bugs
+            # Tiempo estimado para issues
+            if [[ "$ISSUE_TYPE" == *"Bug"* ]]; then
+              TIME_ESTIMATE=21600000  # 6 horas para bugs
+            elif [[ "$ISSUE_TYPE" == *"Feature"* ]]; then
+              TIME_ESTIMATE=36000000  # 10 horas para features
             else
-              TAGS='["vecinapp", "issue", "enhancement"]'
-              PRIORITY=3  # Normal para features
+              TIME_ESTIMATE=10800000  # 3 horas para otros
             fi
           
-            TIME_ESTIMATE=18000000  # 5 horas en ms para issues
           else
-            TITLE="[Vecinapp] Evento: ${{ github.event_name }}"
-            DESC="**Evento:** ${{ github.event_name }}\\n**Actor:** ${{ github.actor }}\\n**Repo:** Vecinapp"
+            TITLE="[Vecinapp] 🔄 Evento: ${{ github.event_name }}"
+            DESC="**🔄 Evento:** ${{ github.event_name }}\\n**👤 Actor:** ${{ github.actor }}\\n**🏢 Repo:** Vecinapp"
             STATUS="to do"
             TAGS='["vecinapp", "other"]'
             PRIORITY=3
@@ -203,9 +454,11 @@ jobs:
                 -H "Content-Type: application/json" \
                 -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
                 -d "{
+                  \"name\": \"$TITLE\",
                   \"status\": \"$STATUS\",
-                  \"description\": \"$DESC\\n\\n**Actualizado:** $(date)\",
-                  \"priority\": $PRIORITY
+                  \"description\": \"$DESC\\n\\n**🔄 Actualizado:** $(date)\",
+                  \"priority\": $PRIORITY,
+                  \"time_estimate\": $TIME_ESTIMATE
                 }"
           
               # Añadir comentario sobre la actualización
@@ -213,7 +466,7 @@ jobs:
                 -H "Content-Type: application/json" \
                 -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
                 -d "{
-                  \"comment_text\": \"Actualización automática desde GitHub: ${{ github.event.action }}\",
+                  \"comment_text\": \"## 🔄 Actualización automática\\n\\n**Evento:** ${{ github.event_name }}\\n**Acción:** ${{ github.event.action }}\\n**Fecha:** $(date)\",
                   \"notify_all\": true
                 }"
             else
@@ -228,7 +481,9 @@ jobs:
                   \"status\": \"$STATUS\",
                   \"tags\": $TAGS,
                   \"priority\": $PRIORITY,
-                  \"time_estimate\": $TIME_ESTIMATE
+                  \"time_estimate\": $TIME_ESTIMATE,
+                  \"assignees\": [\"${{ steps.vecinapp-components.outputs.assignee_id }}\"],
+                  \"notify_all\": true
                 }"
             fi
           else
@@ -243,11 +498,13 @@ jobs:
                 \"status\": \"$STATUS\",
                 \"tags\": $TAGS,
                 \"priority\": $PRIORITY,
-                \"time_estimate\": $TIME_ESTIMATE
+                \"time_estimate\": $TIME_ESTIMATE,
+                \"assignees\": [\"${{ steps.vecinapp-components.outputs.assignee_id }}\"],
+                \"notify_all\": true
               }"
           fi
 
-  # JOB 2: Compilar y probar Vecinapp
+  # JOB 3: Compilar y probar Vecinapp
   build-and-test:
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
@@ -277,6 +534,11 @@ jobs:
         run: ./gradlew testDebug
         continue-on-error: true
 
+      - name: Run lint
+        id: lint
+        run: ./gradlew lintDebug
+        continue-on-error: true
+
       - name: Check Firebase configuration
         id: firebase
         run: |
@@ -284,6 +546,21 @@ jobs:
             echo "firebase_config=✅ Configuración de Firebase presente" >> $GITHUB_OUTPUT
           else
             echo "firebase_config=⚠️ Falta archivo google-services.json" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate APK info
+        id: apk-info
+        if: steps.build.outcome == 'success'
+        run: |
+          APK_PATH=$(find app/build/outputs -name "*.apk" | head -1)
+          
+          if [ ! -z "$APK_PATH" ]; then
+            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+            echo "apk_size=$APK_SIZE" >> $GITHUB_OUTPUT
+            echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+            echo "apk_found=true" >> $GITHUB_OUTPUT
+          else
+            echo "apk_found=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Update ClickUp with build results
@@ -300,6 +577,20 @@ jobs:
             TEST_STATUS="✅ Tests exitosos"
           else
             TEST_STATUS="❌ Tests fallidos"
+          fi
+          
+          # Determinar resultado del lint
+          if [ "${{ steps.lint.outcome }}" == "success" ]; then
+            LINT_STATUS="✅ Lint exitoso"
+          else
+            LINT_STATUS="⚠️ Advertencias de lint"
+          fi
+          
+          # Información del APK
+          if [ "${{ steps.apk-info.outputs.apk_found }}" == "true" ]; then
+            APK_INFO="✅ APK generado (Tamaño: ${{ steps.apk-info.outputs.apk_size }})"
+          else
+            APK_INFO="❌ No se generó APK"
           fi
           
           # Buscar la tarea más reciente relacionada con este commit/PR
@@ -322,7 +613,7 @@ jobs:
               -H "Content-Type: application/json" \
               -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
               -d "{
-                \"comment_text\": \"### Resultados de CI/CD\\n\\n$BUILD_STATUS\\n$TEST_STATUS\\n${{ steps.firebase.outputs.firebase_config }}\\n\\nEjecutado: $(date)\",
+                \"comment_text\": \"## 🚀 Resultados de CI/CD\\n\\n$BUILD_STATUS\\n$TEST_STATUS\\n$LINT_STATUS\\n$APK_INFO\\n${{ steps.firebase.outputs.firebase_config }}\\n\\n**⏰ Ejecutado:** $(date)\\n\\n**🔗 [Ver detalles completos](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})**\",
                 \"notify_all\": true
               }"
           
@@ -337,8 +628,8 @@ jobs:
             fi
           fi
 
-  # JOB 3: Generar informe semanal
-  weekly-report:
+  # JOB 4: Generar informe semanal mejorado
+  enhanced-weekly-report:
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule'
     steps:
@@ -350,17 +641,71 @@ jobs:
       - name: Generate Vecinapp development stats
         id: stats
         run: |
-          # Obtener estadísticas de la semana anterior
-          COMMITS=$(git log --since="1 week ago" --oneline | wc -l)
-          AUTHORS=$(git log --since="1 week ago" --format="%an" | sort -u | wc -l)
-          FILES=$(git log --since="1 week ago" --name-only --pretty=format: | sort -u | wc -l)
+          # Determinar si es reporte de fin de semana o semanal
+          if [ "$(date +%u)" == "5" ]; then
+            # Viernes - Reporte de fin de semana
+            REPORT_TYPE="fin de semana"
+            TIME_PERIOD="3 days"
+          else
+            # Lunes - Reporte semanal
+            REPORT_TYPE="semanal"
+            TIME_PERIOD="1 week"
+          fi
+          
+          # Obtener estadísticas del período
+          COMMITS=$(git log --since="$TIME_PERIOD ago" --oneline | wc -l)
+          AUTHORS=$(git log --since="$TIME_PERIOD ago" --format="%an" | sort -u | wc -l)
+          FILES=$(git log --since="$TIME_PERIOD ago" --name-only --pretty=format: | sort -u | wc -l)
           
           # Estadísticas específicas de Vecinapp
-          AUTH_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Authentication")
-          NAV_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Navigation")
-          FIREBASE_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Firebase")
-          UI_CHANGES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "UI\|Components")
+          AUTH_CHANGES=$(git log --since="$TIME_PERIOD ago" --name-only --pretty=format: | grep -c "Authentication" || echo 0)
+          NAV_CHANGES=$(git log --since="$TIME_PERIOD ago" --name-only --pretty=format: | grep -c "Navigation" || echo 0)
+          FIREBASE_CHANGES=$(git log --since="$TIME_PERIOD ago" --name-only --pretty=format: | grep -c "Firebase" || echo 0)
+          UI_CHANGES=$(git log --since="$TIME_PERIOD ago" --name-only --pretty=format: | grep -c "UI\|Components" || echo 0)
           
+          # Calcular velocidad de desarrollo
+          PREV_PERIOD_COMMITS=$(git log --since="$TIME_PERIOD ago" --until="$TIME_PERIOD ago" --oneline | wc -l)
+          if [ $PREV_PERIOD_COMMITS -eq 0 ]; then
+            VELOCITY_CHANGE="N/A (sin datos previos)"
+          else
+            VELOCITY_PERCENT=$(( ($COMMITS - $PREV_PERIOD_COMMITS) * 100 / $PREV_PERIOD_COMMITS ))
+            if [ $VELOCITY_PERCENT -gt 0 ]; then
+              VELOCITY_CHANGE="⬆️ +$VELOCITY_PERCENT% vs período anterior"
+            elif [ $VELOCITY_PERCENT -lt 0 ]; then
+              VELOCITY_CHANGE="⬇️ $VELOCITY_PERCENT% vs período anterior"
+            else
+              VELOCITY_CHANGE="➡️ Sin cambios vs período anterior"
+            fi
+          fi
+          
+          # Obtener los principales contribuidores
+          TOP_CONTRIBUTORS=$(git log --since="$TIME_PERIOD ago" --format="%an" | sort | uniq -c | sort -nr | head -5 | awk '{print "- " $2 " " $3 ": " $1 " commits"}')
+          
+          # Obtener tipos de commits
+          FEATURE_COMMITS=$(git log --since="$TIME_PERIOD ago" --oneline | grep -ci "feat\|feature" || echo 0)
+          FIX_COMMITS=$(git log --since="$TIME_PERIOD ago" --oneline | grep -ci "fix\|bug" || echo 0)
+          REFACTOR_COMMITS=$(git log --since="$TIME_PERIOD ago" --oneline | grep -ci "refactor" || echo 0)
+          OTHER_COMMITS=$(( $COMMITS - $FEATURE_COMMITS - $FIX_COMMITS - $REFACTOR_COMMITS ))
+          
+          # Calcular salud del proyecto
+          if [ $FIX_COMMITS -eq 0 ] || [ $COMMITS -eq 0 ]; then
+            FIX_RATIO=0
+          else
+            FIX_RATIO=$(( $FIX_COMMITS * 100 / $COMMITS ))
+          fi
+          
+          if [ $FIX_RATIO -lt 20 ]; then
+            PROJECT_HEALTH="🟢 Excelente"
+          elif [ $FIX_RATIO -lt 40 ]; then
+            PROJECT_HEALTH="🟡 Buena"
+          elif [ $FIX_RATIO -lt 60 ]; then
+            PROJECT_HEALTH="🟠 Regular"
+          else
+            PROJECT_HEALTH="🔴 Necesita atención"
+          fi
+          
+          # Guardar todas las variables para el reporte
+          echo "report_type=$REPORT_TYPE" >> $GITHUB_OUTPUT
           echo "commits=$COMMITS" >> $GITHUB_OUTPUT
           echo "authors=$AUTHORS" >> $GITHUB_OUTPUT
           echo "files=$FILES" >> $GITHUB_OUTPUT
@@ -368,26 +713,101 @@ jobs:
           echo "nav_changes=$NAV_CHANGES" >> $GITHUB_OUTPUT
           echo "firebase_changes=$FIREBASE_CHANGES" >> $GITHUB_OUTPUT
           echo "ui_changes=$UI_CHANGES" >> $GITHUB_OUTPUT
+          echo "velocity_change=$VELOCITY_CHANGE" >> $GITHUB_OUTPUT
+          echo "feature_commits=$FEATURE_COMMITS" >> $GITHUB_OUTPUT
+          echo "fix_commits=$FIX_COMMITS" >> $GITHUB_OUTPUT
+          echo "refactor_commits=$REFACTOR_COMMITS" >> $GITHUB_OUTPUT
+          echo "other_commits=$OTHER_COMMITS" >> $GITHUB_OUTPUT
+          echo "project_health=$PROJECT_HEALTH" >> $GITHUB_OUTPUT
           
-          # Obtener los principales contribuidores
-          TOP_CONTRIBUTORS=$(git log --since="1 week ago" --format="%an" | sort | uniq -c | sort -nr | head -5 | awk '{print "- " $2 " " $3 ": " $1 " commits"}')
           echo "top_contributors<<EOF" >> $GITHUB_OUTPUT
           echo "$TOP_CONTRIBUTORS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+          
+          # Obtener commits recientes para el resumen
+          RECENT_COMMITS=$(git log --since="$TIME_PERIOD ago" --pretty=format:"- %ad: %s" --date=short | head -10)
+          echo "recent_commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$RECENT_COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create weekly report in ClickUp
+      - name: Create enhanced report in ClickUp
         run: |
           REPORT_DATE=$(date +"%Y-%m-%d")
-          START_DATE=$(date -d "1 week ago" +"%Y-%m-%d")
           
+          if [ "${{ steps.stats.outputs.report_type }}" == "fin de semana" ]; then
+            START_DATE=$(date -d "3 days ago" +"%Y-%m-%d")
+            TITLE="📊 Reporte de Fin de Semana Vecinapp: $START_DATE a $REPORT_DATE"
+          else
+            START_DATE=$(date -d "1 week ago" +"%Y-%m-%d")
+            TITLE="📊 Reporte Semanal Vecinapp: $START_DATE a $REPORT_DATE"
+          fi
+          
+          # Crear descripción enriquecida para el reporte
+          DESC="# 📈 Reporte de Desarrollo Vecinapp ${{ steps.stats.outputs.report_type }}\\n\\n"
+          DESC="${DESC}**📅 Periodo:** $START_DATE a $REPORT_DATE\\n\\n"
+          
+          DESC="${DESC}## 🔍 Resumen Ejecutivo\\n\\n"
+          DESC="${DESC}- **💻 Actividad:** ${{ steps.stats.outputs.commits }} commits por ${{ steps.stats.outputs.authors }} desarrolladores\\n"
+          DESC="${DESC}- **🚀 Velocidad:** ${{ steps.stats.outputs.velocity_change }}\\n"
+          DESC="${DESC}- **🩺 Salud del proyecto:** ${{ steps.stats.outputs.project_health }}\\n\\n"
+          
+          DESC="${DESC}## 📊 Estadísticas Detalladas\\n\\n"
+          DESC="${DESC}### 📝 Actividad\\n\\n"
+          DESC="${DESC}- **📁 Archivos modificados:** ${{ steps.stats.outputs.files }}\\n"
+          DESC="${DESC}- **👥 Desarrolladores activos:** ${{ steps.stats.outputs.authors }}\\n"
+          DESC="${DESC}- **📈 Commits totales:** ${{ steps.stats.outputs.commits }}\\n\\n"
+          
+          DESC="${DESC}### 🧩 Componentes Vecinapp\\n\\n"
+          DESC="${DESC}- **🔐 Cambios en autenticación:** ${{ steps.stats.outputs.auth_changes }}\\n"
+          DESC="${DESC}- **🧭 Cambios en navegación:** ${{ steps.stats.outputs.nav_changes }}\\n"
+          DESC="${DESC}- **🔥 Cambios en Firebase:** ${{ steps.stats.outputs.firebase_changes }}\\n"
+          DESC="${DESC}- **🎨 Cambios en UI:** ${{ steps.stats.outputs.ui_changes }}\\n\\n"
+          
+          DESC="${DESC}### 📋 Tipos de Commits\\n\\n"
+          DESC="${DESC}- **✨ Features nuevas:** ${{ steps.stats.outputs.feature_commits }}\\n"
+          DESC="${DESC}- **🐛 Fixes de bugs:** ${{ steps.stats.outputs.fix_commits }}\\n"
+          DESC="${DESC}- **♻️ Refactorizaciones:** ${{ steps.stats.outputs.refactor_commits }}\\n"
+          DESC="${DESC}- **🔄 Otros cambios:** ${{ steps.stats.outputs.other_commits }}\\n\\n"
+          
+          DESC="${DESC}## 👥 Principales Contribuidores\\n\\n${{ steps.stats.outputs.top_contributors }}\\n\\n"
+          
+          DESC="${DESC}## 📝 Commits Recientes\\n\\n${{ steps.stats.outputs.recent_commits }}\\n\\n"
+          
+          DESC="${DESC}## 🔮 Próximos Pasos Recomendados\\n\\n"
+          
+          # Recomendaciones basadas en las estadísticas
+          if [ ${{ steps.stats.outputs.fix_commits }} -gt ${{ steps.stats.outputs.feature_commits }} ]; then
+            DESC="${DESC}- **🐛 Enfoque en estabilidad:** Considerar una fase de estabilización para reducir el número de bugs\\n"
+          fi
+          
+          if [ ${{ steps.stats.outputs.auth_changes }} -gt 0 ]; then
+            DESC="${DESC}- **🔐 Revisar seguridad:** Se han realizado cambios en el sistema de autenticación\\n"
+          fi
+          
+          if [ ${{ steps.stats.outputs.firebase_changes }} -gt 0 ]; then
+            DESC="${DESC}- **🔥 Verificar Firebase:** Asegurar que los cambios en Firebase estén correctamente configurados\\n"
+          fi
+          
+          if [ ${{ steps.stats.outputs.ui_changes }} -gt 0 ]; then
+            DESC="${DESC}- **🎨 Validar UI:** Realizar pruebas de usabilidad para los cambios de interfaz\\n"
+          fi
+          
+          DESC="${DESC}- **📝 Actualizar documentación:** Mantener la documentación al día con los cambios recientes\\n"
+          DESC="${DESC}- **🧪 Ampliar cobertura de tests:** Asegurar que los nuevos cambios estén cubiertos por tests\\n\\n"
+          
+          DESC="${DESC}## 🔗 Enlaces\\n\\n"
+          DESC="${DESC}- **📊 [Ver todos los commits](https://github.com/${{ github.repository }}/commits)**\\n"
+          DESC="${DESC}- **📈 [Ver estadísticas en GitHub](https://github.com/${{ github.repository }}/pulse)**"
+          
+          # Crear tarea en ClickUp con el reporte
           curl -X POST "https://api.clickup.com/api/v2/list/901312972197/task" \
             -H "Content-Type: application/json" \
             -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
             -d "{
-              \"name\": \"📊 Reporte Semanal Vecinapp: $START_DATE a $REPORT_DATE\",
-              \"description\": \"## Reporte de Desarrollo Vecinapp Semanal\\n\\n**Periodo:** $START_DATE a $REPORT_DATE\\n\\n### Estadísticas\\n- **Commits:** ${{ steps.stats.outputs.commits }}\\n- **Desarrolladores activos:** ${{ steps.stats.outputs.authors }}\\n- **Archivos modificados:** ${{ steps.stats.outputs.files }}\\n\\n### Componentes Vecinapp\\n- **Cambios en autenticación:** ${{ steps.stats.outputs.auth_changes }}\\n- **Cambios en navegación:** ${{ steps.stats.outputs.nav_changes }}\\n- **Cambios en Firebase:** ${{ steps.stats.outputs.firebase_changes }}\\n- **Cambios en UI:** ${{ steps.stats.outputs.ui_changes }}\\n\\n### Principales contribuidores\\n${{ steps.stats.outputs.top_contributors }}\",
+              \"name\": \"$TITLE\",
+              \"description\": \"$DESC\",
               \"status\": \"complete\",
-              \"tags\": [\"reporte\", \"semanal\", \"vecinapp\"],
+              \"tags\": [\"reporte\", \"${{ steps.stats.outputs.report_type }}\", \"vecinapp\"],
               \"priority\": 3,
               \"notify_all\": true
             }"
