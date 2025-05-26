@@ -1,4 +1,4 @@
-name: Update ClickUp
+name: Sync GitHub to ClickUp
 
 on:
   push:
@@ -15,20 +15,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Update ClickUp
+      - name: Get commit details
+        id: commit-details
         run: |
-          # Obtener información del evento
-          EVENT_TYPE="${{ github.event_name }}"
-          REPO="${{ github.repository }}"
-          ACTOR="${{ github.actor }}"
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "message=$(git log -1 --pretty=format:%s)" >> $GITHUB_OUTPUT
+            echo "author=$(git log -1 --pretty=format:%an)" >> $GITHUB_OUTPUT
+            echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create ClickUp task
+        run: |
+          # Determinar el título y descripción según el tipo de evento
+          if [ "${{ github.event_name }}" == "push" ]; then
+            TITLE="[GitHub] Nuevo commit en ${{ steps.commit-details.outputs.branch }}"
+            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\n**Autor:** ${{ steps.commit-details.outputs.author }}\n**Branch:** ${{ steps.commit-details.outputs.branch }}\n**Repo:** Vecinapp"
+            TAGS='["github", "commit", "${{ steps.commit-details.outputs.branch }}"]'
+            STATUS="in progress"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            TITLE="[GitHub] PR: ${{ github.event.pull_request.title }}"
+            DESC="**PR:** ${{ github.event.pull_request.title }}\n**Autor:** ${{ github.event.pull_request.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp"
+            TAGS='["github", "pull-request", "${{ github.event.action }}"]'
+            STATUS="${{ github.event.action == 'opened' && 'to do' || 'complete' }}"
+          elif [ "${{ github.event_name }}" == "issues" ]; then
+            TITLE="[GitHub] Issue: ${{ github.event.issue.title }}"
+            DESC="**Issue:** ${{ github.event.issue.title }}\n**Autor:** ${{ github.event.issue.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp"
+            TAGS='["github", "issue", "${{ github.event.action }}"]'
+            STATUS="${{ github.event.action == 'opened' && 'to do' || 'complete' }}"
+          else
+            TITLE="[GitHub] Evento: ${{ github.event_name }}"
+            DESC="**Evento:** ${{ github.event_name }}\n**Actor:** ${{ github.actor }}\n**Repo:** Vecinapp"
+            TAGS='["github", "other"]'
+            STATUS="to do"
+          fi
           
-          # Crear tarea en ClickUp
-          curl -X POST "https://api.clickup.com/api/v2/list/YOUR_LIST_ID/task" \
+          # Crear la tarea en ClickUp
+          curl -X POST "https://api.clickup.com/api/v2/list/901312972197/task" \
             -H "Content-Type: application/json" \
-            -H "Authorization: 49ANTM8Q6AWCA372BX9XCPIT22XGGPCT" \
-            -d '{
-              "name": "GitHub: '$EVENT_TYPE' by '$ACTOR'",
-              "description": "Repository: '$REPO'\nEvent: '$EVENT_TYPE'\nActor: '$ACTOR'",
-              "status": "to do",
-              "tags": ["github", "'$EVENT_TYPE'"]
-            }'
+            -H "Authorization: 88098707_1cc7444b8fc25c4b11f2a81b667779533b2bff36cfa9508200c75d39cf38f97e" \
+            -d "{
+              \"name\": \"$TITLE\",
+              \"description\": \"$DESC\",
+              \"status\": \"$STATUS\",
+              \"tags\": $TAGS
+            }"
