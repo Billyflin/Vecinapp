@@ -1,61 +1,398 @@
-name: Sync GitHub to ClickUp
+name: Android CI/CD with ClickUp Integration
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, feature/*, release/* ]
   pull_request:
     types: [ opened, closed, merged ]
   issues:
-    types: [ opened, closed ]
+    types: [ opened, closed, reopened, assigned ]
+  # Programar informes semanales
+  schedule:
+    - cron: '0 9 * * MON'  # Cada lunes a las 9:00
 
 jobs:
+  # JOB 1: Integración con ClickUp para eventos de código
   update-clickup:
     runs-on: ubuntu-latest
+    # No ejecutar para el informe semanal programado
+    if: github.event_name != 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Obtener todo el historial para análisis
+
+      - name: Get commit details
+        id: commit-details
+        if: github.event_name == 'push'
+        run: |
+          echo "message=$(git log -1 --pretty=format:%s)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=format:%an)" >> $GITHUB_OUTPUT
+          echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "files_changed=$(git diff --name-only HEAD^ HEAD | wc -l)" >> $GITHUB_OUTPUT
+          echo "lines_added=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$1} END {print sum}')" >> $GITHUB_OUTPUT
+          echo "lines_removed=$(git diff --numstat HEAD^ HEAD | awk '{sum+=$2} END {print sum}')" >> $GITHUB_OUTPUT
+
+      - name: Determine Android components changed
+        id: android-components
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        run: |
+          # Detectar componentes Android modificados
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/java/.*Activity\.kt"; then
+            echo "activities_changed=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/java/.*Fragment\.kt"; then
+            echo "fragments_changed=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/res/layout/"; then
+            echo "layouts_changed=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/build.gradle"; then
+            echo "dependencies_changed=true" >> $GITHUB_OUTPUT
+          fi
+          if git diff --name-only ${{ github.event_name == 'push' && 'HEAD^ HEAD' || format('origin/{0} HEAD', github.base_ref) }} | grep -q "app/src/main/AndroidManifest.xml"; then
+            echo "manifest_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create or update ClickUp task
+        run: |
+          # Determinar el título, descripción y estado según el tipo de evento
+          if [ "${{ github.event_name }}" == "push" ]; then
+            # Determinar el tipo de cambio para Android
+            ANDROID_CHANGES=""
+            if [ "${{ steps.android-components.outputs.activities_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Activities"
+            fi
+            if [ "${{ steps.android-components.outputs.fragments_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Fragments"
+            fi
+            if [ "${{ steps.android-components.outputs.layouts_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en layouts XML"
+            fi
+            if [ "${{ steps.android-components.outputs.dependencies_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Actualización de dependencias"
+            fi
+            if [ "${{ steps.android-components.outputs.manifest_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en AndroidManifest"
+            fi
+          
+            # Si no se detectaron cambios específicos
+            if [ -z "$ANDROID_CHANGES" ]; then
+              ANDROID_CHANGES="\n- Otros cambios en el código"
+            fi
+          
+            TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:50}"
+            COMMIT_MSG="${{ steps.commit-details.outputs.message }}"
+            if [ ${#COMMIT_MSG} -gt 50 ]; then
+              TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: ${COMMIT_MSG:0:47}..."
+            else
+              TITLE="[Android] Commit en ${{ steps.commit-details.outputs.branch }}: $COMMIT_MSG"
+            fi
+          
+            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\n**Autor:** ${{ steps.commit-details.outputs.author }}\n**Branch:** ${{ steps.commit-details.outputs.branch }}\n**Repo:** Vecinapp\n\n**Cambios:**$ANDROID_CHANGES\n\n**Estadísticas:**\n- Archivos modificados: ${{ steps.commit-details.outputs.files_changed }}\n- Líneas añadidas: ${{ steps.commit-details.outputs.lines_added }}\n- Líneas eliminadas: ${{ steps.commit-details.outputs.lines_removed }}\n\n**Link:** https://github.com/${{ github.repository }}/commit/${{ github.sha }}"
+            STATUS="in progress"
+            TAGS='["android", "commit", "${{ steps.commit-details.outputs.branch }}"]'
+          
+            # Determinar prioridad basada en el mensaje del commit
+            if echo "${{ steps.commit-details.outputs.message }}" | grep -qi "fix\|bug\|error\|crash\|ANR"; then
+              PRIORITY=1  # Urgente
+            elif echo "${{ steps.commit-details.outputs.message }}" | grep -qi "feature\|feat"; then
+              PRIORITY=2  # Alta
+            else
+              PRIORITY=3  # Normal
+            fi
+          
+            # Estimar tiempo basado en cambios
+            if [ ${{ steps.commit-details.outputs.files_changed }} -gt 10 ] || [ ${{ steps.commit-details.outputs.lines_added }} -gt 500 ]; then
+              TIME_ESTIMATE=28800000  # 8 horas en ms
+            elif [ ${{ steps.commit-details.outputs.files_changed }} -gt 5 ] || [ ${{ steps.commit-details.outputs.lines_added }} -gt 200 ]; then
+              TIME_ESTIMATE=14400000  # 4 horas en ms
+            else
+              TIME_ESTIMATE=7200000   # 2 horas en ms
+            fi
+          
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            # Determinar componentes Android para PRs
+            ANDROID_CHANGES=""
+            if [ "${{ steps.android-components.outputs.activities_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Activities"
+            fi
+            if [ "${{ steps.android-components.outputs.fragments_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Modificación de Fragments"
+            fi
+            if [ "${{ steps.android-components.outputs.layouts_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en layouts XML"
+            fi
+            if [ "${{ steps.android-components.outputs.dependencies_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Actualización de dependencias"
+            fi
+            if [ "${{ steps.android-components.outputs.manifest_changed }}" == "true" ]; then
+              ANDROID_CHANGES="$ANDROID_CHANGES\n- Cambios en AndroidManifest"
+            fi
+          
+            # Si no se detectaron cambios específicos
+            if [ -z "$ANDROID_CHANGES" ]; then
+              ANDROID_CHANGES="\n- Otros cambios en el código"
+            fi
+          
+            TITLE="[Android] PR: ${{ github.event.pull_request.title }}"
+            DESC="**PR:** ${{ github.event.pull_request.title }}\n**Autor:** ${{ github.event.pull_request.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp\n\n**Componentes modificados:**$ANDROID_CHANGES\n\n**Link:** ${{ github.event.pull_request.html_url }}"
+          
+            if [ "${{ github.event.action }}" == "opened" ]; then
+              STATUS="to do"
+            elif [ "${{ github.event.action }}" == "closed" ]; then
+              if [ "${{ github.event.pull_request.merged }}" == "true" ]; then
+                STATUS="complete"
+                DESC="$DESC\n\n**Merged:** ✅"
+              else
+                STATUS="closed"
+                DESC="$DESC\n\n**Merged:** ❌"
+              fi
+            else
+              STATUS="in progress"
+            fi
+          
+            TAGS='["android", "pull-request", "${{ github.event.action }}"]'
+            PRIORITY=2  # Alta para PRs
+            TIME_ESTIMATE=21600000  # 6 horas en ms para revisar PRs
+          
+          elif [ "${{ github.event_name }}" == "issues" ]; then
+            TITLE="[Android] Issue: ${{ github.event.issue.title }}"
+            DESC="**Issue:** ${{ github.event.issue.title }}\n**Autor:** ${{ github.event.issue.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp\n\n**Descripción:**\n${{ github.event.issue.body }}\n\n**Link:** ${{ github.event.issue.html_url }}"
+          
+            if [ "${{ github.event.action }}" == "opened" ]; then
+              STATUS="to do"
+            elif [ "${{ github.event.action }}" == "closed" ]; then
+              STATUS="complete"
+            elif [ "${{ github.event.action }}" == "reopened" ]; then
+              STATUS="reopened"
+            else
+              STATUS="in progress"
+            fi
+          
+            # Determinar si es un bug o feature request basado en etiquetas o título
+            if echo "${{ toJson(github.event.issue.labels) }}" | grep -qi "bug" || echo "${{ github.event.issue.title }}" | grep -qi "bug\|error\|crash\|fallo"; then
+              TAGS='["android", "issue", "bug"]'
+              PRIORITY=1  # Urgente para bugs
+            else
+              TAGS='["android", "issue", "enhancement"]'
+              PRIORITY=3  # Normal para features
+            fi
+          
+            TIME_ESTIMATE=18000000  # 5 horas en ms para issues
+          else
+            TITLE="[Android] Evento: ${{ github.event_name }}"
+            DESC="**Evento:** ${{ github.event_name }}\n**Actor:** ${{ github.actor }}\n**Repo:** Vecinapp"
+            STATUS="to do"
+            TAGS='["android", "other"]'
+            PRIORITY=3
+            TIME_ESTIMATE=7200000  # 2 horas en ms
+          fi
+          
+          # Buscar si ya existe una tarea con este título (para actualizar en lugar de crear nueva)
+          if [ "${{ github.event_name }}" == "pull_request" ] || [ "${{ github.event_name }}" == "issues" ]; then
+            SEARCH_TERM="$TITLE"
+          
+            TASK_ID=$(curl -s -G "https://api.clickup.com/api/v2/list/901312972197/task" \
+              --data-urlencode "name=$SEARCH_TERM" \
+              -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" | \
+              jq -r '.tasks[0].id')
+          
+            if [ "$TASK_ID" != "null" ] && [ ! -z "$TASK_ID" ]; then
+              # Actualizar tarea existente
+              echo "Actualizando tarea existente: $TASK_ID"
+              curl -X PUT "https://api.clickup.com/api/v2/task/$TASK_ID" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+                -d "{
+                  \"status\": \"$STATUS\",
+                  \"description\": \"$DESC\\n\\n**Actualizado:** $(date)\",
+                  \"priority\": $PRIORITY
+                }"
+          
+              # Añadir comentario sobre la actualización
+              curl -X POST "https://api.clickup.com/api/v2/task/$TASK_ID/comment" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+                -d "{
+                  \"comment_text\": \"Actualización automática desde GitHub: ${{ github.event.action }}\",
+                  \"notify_all\": true
+                }"
+            else
+              # Crear nueva tarea
+              echo "Creando nueva tarea"
+              curl -X POST "https://api.clickup.com/api/v2/list/901312972197/task" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+                -d "{
+                  \"name\": \"$TITLE\",
+                  \"description\": \"$DESC\",
+                  \"status\": \"$STATUS\",
+                  \"tags\": $TAGS,
+                  \"priority\": $PRIORITY,
+                  \"time_estimate\": $TIME_ESTIMATE
+                }"
+            fi
+          else
+            # Para commits, siempre crear nueva tarea
+            echo "Creando nueva tarea para commit"
+            curl -X POST "https://api.clickup.com/api/v2/list/901312972197/task" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+              -d "{
+                \"name\": \"$TITLE\",
+                \"description\": \"$DESC\",
+                \"status\": \"$STATUS\",
+                \"tags\": $TAGS,
+                \"priority\": $PRIORITY,
+                \"time_estimate\": $TIME_ESTIMATE
+              }"
+          fi
+
+  # JOB 2: Compilar y probar la aplicación Android
+  build-and-test:
+    runs-on: ubuntu-latest
+    # No ejecutar para el informe semanal programado
+    if: github.event_name != 'schedule'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Get commit details
-        id: commit-details
-        run: |
-          if [ "${{ github.event_name }}" == "push" ]; then
-            echo "message=$(git log -1 --pretty=format:%s)" >> $GITHUB_OUTPUT
-            echo "author=$(git log -1 --pretty=format:%an)" >> $GITHUB_OUTPUT
-            echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
-          fi
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-      - name: Create ClickUp task
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build with Gradle
+        id: build
+        run: ./gradlew assembleDebug
+        continue-on-error: true
+
+      - name: Run tests
+        id: test
+        run: ./gradlew testDebug
+        continue-on-error: true
+
+      - name: Run lint
+        id: lint
+        run: ./gradlew lintDebug
+        continue-on-error: true
+
+      - name: Update ClickUp with build results
         run: |
-          # Determinar el título y descripción según el tipo de evento
-          if [ "${{ github.event_name }}" == "push" ]; then
-            TITLE="[GitHub] Nuevo commit en ${{ steps.commit-details.outputs.branch }}"
-            DESC="**Commit:** ${{ steps.commit-details.outputs.message }}\n**Autor:** ${{ steps.commit-details.outputs.author }}\n**Branch:** ${{ steps.commit-details.outputs.branch }}\n**Repo:** Vecinapp"
-            TAGS='["github", "commit", "${{ steps.commit-details.outputs.branch }}"]'
-            STATUS="in progress"
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            TITLE="[GitHub] PR: ${{ github.event.pull_request.title }}"
-            DESC="**PR:** ${{ github.event.pull_request.title }}\n**Autor:** ${{ github.event.pull_request.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp"
-            TAGS='["github", "pull-request", "${{ github.event.action }}"]'
-            STATUS="${{ github.event.action == 'opened' && 'to do' || 'complete' }}"
-          elif [ "${{ github.event_name }}" == "issues" ]; then
-            TITLE="[GitHub] Issue: ${{ github.event.issue.title }}"
-            DESC="**Issue:** ${{ github.event.issue.title }}\n**Autor:** ${{ github.event.issue.user.login }}\n**Estado:** ${{ github.event.action }}\n**Repo:** Vecinapp"
-            TAGS='["github", "issue", "${{ github.event.action }}"]'
-            STATUS="${{ github.event.action == 'opened' && 'to do' || 'complete' }}"
+          # Determinar resultado de la compilación
+          if [ "${{ steps.build.outcome }}" == "success" ]; then
+            BUILD_STATUS="✅ Compilación exitosa"
           else
-            TITLE="[GitHub] Evento: ${{ github.event_name }}"
-            DESC="**Evento:** ${{ github.event_name }}\n**Actor:** ${{ github.actor }}\n**Repo:** Vecinapp"
-            TAGS='["github", "other"]'
-            STATUS="to do"
+            BUILD_STATUS="❌ Error de compilación"
           fi
           
-          # Crear la tarea en ClickUp
+          # Determinar resultado de las pruebas
+          if [ "${{ steps.test.outcome }}" == "success" ]; then
+            TEST_STATUS="✅ Tests exitosos"
+          else
+            TEST_STATUS="❌ Tests fallidos"
+          fi
+          
+          # Determinar resultado del lint
+          if [ "${{ steps.lint.outcome }}" == "success" ]; then
+            LINT_STATUS="✅ Lint exitoso"
+          else
+            LINT_STATUS="⚠️ Advertencias de lint"
+          fi
+          
+          # Buscar la tarea más reciente relacionada con este commit/PR
+          if [ "${{ github.event_name }}" == "push" ]; then
+            SEARCH_TERM="[Android] Commit en ${GITHUB_REF#refs/heads/}"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            SEARCH_TERM="[Android] PR: ${{ github.event.pull_request.title }}"
+          else
+            SEARCH_TERM="[Android]"
+          fi
+          
+          TASK_ID=$(curl -s -G "https://api.clickup.com/api/v2/list/901312972197/task" \
+            --data-urlencode "name=$SEARCH_TERM" \
+            -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" | \
+            jq -r '.tasks[0].id')
+          
+          if [ "$TASK_ID" != "null" ] && [ ! -z "$TASK_ID" ]; then
+            # Añadir comentario con los resultados de la compilación
+            curl -X POST "https://api.clickup.com/api/v2/task/$TASK_ID/comment" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+              -d "{
+                \"comment_text\": \"### Resultados de CI/CD\\n\\n$BUILD_STATUS\\n$TEST_STATUS\\n$LINT_STATUS\\n\\nEjecutado: $(date)\",
+                \"notify_all\": true
+              }"
+          
+            # Actualizar estado de la tarea según los resultados
+            if [ "${{ steps.build.outcome }}" != "success" ] || [ "${{ steps.test.outcome }}" != "success" ]; then
+              curl -X PUT "https://api.clickup.com/api/v2/task/$TASK_ID" \
+                -H "Content-Type: application/json" \
+                -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
+                -d "{
+                  \"status\": \"bloqueado\"
+                }"
+            fi
+          fi
+
+  # JOB 3: Generar informe semanal
+  weekly-report:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Obtener todo el historial
+
+      - name: Generate Android development stats
+        id: stats
+        run: |
+          # Obtener estadísticas de la semana anterior
+          COMMITS=$(git log --since="1 week ago" --oneline | wc -l)
+          AUTHORS=$(git log --since="1 week ago" --format="%an" | sort -u | wc -l)
+          FILES=$(git log --since="1 week ago" --name-only --pretty=format: | sort -u | wc -l)
+          
+          # Estadísticas específicas de Android
+          ACTIVITIES=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Activity.kt")
+          FRAGMENTS=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "Fragment.kt")
+          LAYOUTS=$(git log --since="1 week ago" --name-only --pretty=format: | grep -c "res/layout/")
+          
+          echo "commits=$COMMITS" >> $GITHUB_OUTPUT
+          echo "authors=$AUTHORS" >> $GITHUB_OUTPUT
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          echo "activities=$ACTIVITIES" >> $GITHUB_OUTPUT
+          echo "fragments=$FRAGMENTS" >> $GITHUB_OUTPUT
+          echo "layouts=$LAYOUTS" >> $GITHUB_OUTPUT
+          
+          # Obtener los principales contribuidores
+          TOP_CONTRIBUTORS=$(git log --since="1 week ago" --format="%an" | sort | uniq -c | sort -nr | head -5 | awk '{print "- " $2 " " $3 ": " $1 " commits"}')
+          echo "top_contributors<<EOF" >> $GITHUB_OUTPUT
+          echo "$TOP_CONTRIBUTORS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create weekly report in ClickUp
+        run: |
+          REPORT_DATE=$(date +"%Y-%m-%d")
+          START_DATE=$(date -d "1 week ago" +"%Y-%m-%d")
+          
           curl -X POST "https://api.clickup.com/api/v2/list/901312972197/task" \
             -H "Content-Type: application/json" \
             -H "Authorization: ${{ secrets.CLICKUP_API_TOKEN }}" \
             -d "{
-              \"name\": \"$TITLE\",
-              \"description\": \"$DESC\",
-              \"status\": \"$STATUS\",
-              \"tags\": $TAGS
+              \"name\": \"Reporte Semanal Android: $START_DATE a $REPORT_DATE\",
+              \"description\": \"## Reporte de Desarrollo Android Semanal\\n\\n**Periodo:** $START_DATE a $REPORT_DATE\\n\\n### Estadísticas\\n- **Commits:** ${{ steps.stats.outputs.commits }}\\n- **Desarrolladores activos:** ${{ steps.stats.outputs.authors }}\\n- **Archivos modificados:** ${{ steps.stats.outputs.files }}\\n\\n### Componentes Android\\n- **Activities modificadas:** ${{ steps.stats.outputs.activities }}\\n- **Fragments modificados:** ${{ steps.stats.outputs.fragments }}\\n- **Layouts XML modificados:** ${{ steps.stats.outputs.layouts }}\\n\\n### Principales contribuidores\\n${{ steps.stats.outputs.top_contributors }}\",
+              \"status\": \"complete\",
+              \"tags\": [\"reporte\", \"semanal\", \"android\"],
+              \"priority\": 3,
+              \"notify_all\": true
             }"
