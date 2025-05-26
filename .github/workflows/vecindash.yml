@@ -1,52 +1,32 @@
-name: Deploy Vecin-Dash
+name: Sync GitHub to ClickUp
 
 on:
   push:
-    branches: [main, develop]
-    paths:
-      - 'dashboards/**'
-      - '.github/workflows/vecindash.yml'
-  workflow_dispatch:       # permite lanzarlo a mano
-
-permissions:
-  contents: read            # required for checkout
-  pages: write              # to deploy to Pages
-  id-token: write           # to authenticate the deploy
+    branches: [ main, develop ]
+  pull_request:
+    types: [ opened, closed, merged ]
+  issues:
+    types: [ opened, closed ]
 
 jobs:
-  deploy:
+  update-clickup:
     runs-on: ubuntu-latest
-    env:
-      CLICKUP_TOKEN:    ${{ secrets.CLICKUP_TOKEN }}
-      CLICKUP_LIST_ID:  ${{ secrets.CLICKUP_LIST_ID }}
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
         with:
-          python-version: '3.11'
+          node-version: '18'
 
       - name: Install dependencies
-        run: pip install streamlit requests pandas python-dateutil
+        run: npm install axios
 
-      - name: Build static site
+      - name: Update ClickUp
+        env:
+          CLICKUP_API_TOKEN: ${{ secrets.CLICKUP_API_TOKEN }}
+          CLICKUP_TEAM_ID: "90131484886"
+          CLICKUP_LIST_ID: ${{ secrets.CLICKUP_LIST_ID }}
         run: |
-          mkdir -p _site
-          # lanza streamlit en background
-          streamlit run dashboards/vecindash.py \
-            --server.headless true \
-            --browser.gatherUsageStats false &
-          sleep 20            # da tiempo a que se inicie
-          # “raspa” la web local a HTML estático
-          wget -r -np -E -p -k http://localhost:8501 -P _site
-
-      - name: Upload artifact to Pages
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site                 # carpeta estática generada
-
-      - name: Deploy to GitHub Pages
-        id: deploy
-        uses: actions/deploy-pages@v2
+          node .github/scripts/update-clickup.js
