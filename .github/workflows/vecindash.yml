@@ -1,0 +1,50 @@
+name: Deploy Vecin-Dash
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - dashboards/**     # redeploy sólo si cambia el dash
+      - .github/workflows/vecindash.yml
+  workflow_dispatch:      # permite lanzarlo a mano
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
+      CLICKUP_LIST_ID: ${{ secrets.CLICKUP_LIST_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install streamlit requests pandas python-dateutil
+
+      - name: Build static site
+        run: |
+          mkdir -p _site
+          streamlit run dashboards/vecindash.py \
+              --server.headless true \
+              --browser.gatherUsageStats false \
+              --server.runOnSave false \
+              --global.developmentMode false &
+          sleep 15  # da tiempo a que streamlit genere la página
+          wget -r -np -E -p -k http://localhost:8501  -P _site
+          pkill streamlit
+
+      - name: Upload to Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions: {pages: write, id-token: write}
+    environment: {name: github-pages, url: ${{ steps.deployment.outputs.page_url }}
+    }
